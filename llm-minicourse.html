@@ -1,0 +1,2465 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Як працюють LLM-трансформери — Мінікурс</title>
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,wght@0,400;0,500;0,600;1,400&family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root {
+  --bg: #FAFAF7;
+  --bg2: #F1EFE8;
+  --bg3: #E8E6DD;
+  --text: #1a1a18;
+  --text2: #5f5e5a;
+  --text3: #888780;
+  --border: rgba(0,0,0,0.1);
+  --purple: #7F77DD;
+  --purple-light: #EEEDFE;
+  --purple-dark: #3C3489;
+  --teal: #1D9E75;
+  --teal-light: #E1F5EE;
+  --coral: #D85A30;
+  --coral-light: #FAECE7;
+  --amber: #BA7517;
+  --amber-light: #FAEEDA;
+  --red: #E24B4A;
+  --green: #1D9E75;
+  --font-display: 'Literata', Georgia, serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-mono: 'Space Mono', monospace;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1a18;
+    --bg2: #2c2c2a;
+    --bg3: #3d3d3a;
+    --text: #e8e6dd;
+    --text2: #b4b2a9;
+    --text3: #888780;
+    --border: rgba(255,255,255,0.1);
+    --purple-light: #26215C;
+    --teal-light: #04342C;
+    --coral-light: #4A1B0C;
+    --amber-light: #412402;
+  }
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.75;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+.container { max-width: 720px; margin: 0 auto; padding: 3rem 1.5rem 6rem; }
+h1 {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5vw, 2.8rem);
+  font-weight: 600;
+  line-height: 1.2;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
+}
+.subtitle { font-size: 1.1rem; color: var(--text2); margin-bottom: 3rem; }
+h2 {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 500;
+  margin: 3.5rem 0 0.75rem;
+  letter-spacing: -0.01em;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border);
+}
+h2 .step-num {
+  display: inline-block;
+  background: var(--purple);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  width: 28px; height: 28px;
+  line-height: 28px;
+  text-align: center;
+  border-radius: 50%;
+  margin-right: 10px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+h2:first-of-type { border-top: none; padding-top: 0; }
+p { margin-bottom: 1rem; }
+strong { font-weight: 600; }
+code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--bg2);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.widget-card {
+  background: var(--bg2);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin: 1.5rem 0;
+  border: 0.5px solid var(--border);
+}
+.widget-card canvas { display: block; }
+.widget-label {
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+.hint {
+  font-size: 0.8rem;
+  color: var(--text3);
+  margin-top: 8px;
+}
+button {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  padding: 8px 18px;
+  border-radius: var(--radius-sm);
+  border: 0.5px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+button:hover { background: var(--bg3); }
+button:active { transform: scale(0.98); }
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg3);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--purple);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+.toc { margin: 2rem 0 3rem; }
+.toc a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  transition: background 0.15s;
+}
+.toc a:hover { background: var(--bg2); }
+.toc .toc-num {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--purple);
+  font-weight: 700;
+  min-width: 24px;
+}
+.toc .toc-part {
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text3);
+  padding: 1rem 14px 0.25rem;
+}
+.part-heading {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text3);
+  text-align: center;
+  margin: 3rem 0 1rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border);
+}
+#scroll-top {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  color: var(--text2);
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s, background .15s;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+#scroll-top.visible { opacity: 1; pointer-events: auto; }
+#scroll-top:hover { background: var(--purple); color: #fff; border-color: var(--purple); }
+.summary-box {
+  background: var(--purple-light);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  margin: 1.5rem 0;
+  border-left: 4px solid var(--purple);
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+</style>
+</head>
+<body>
+<button id="scroll-top" onclick="window.scrollTo({top:0})">↑</button>
+<div class="container">
+
+<h1>Як працюють LLM-трансформери</h1>
+<p class="subtitle">Інтерактивний мінікурс — від токенів до агентів</p>
+
+<nav class="toc">
+  <div class="toc-part">Частина I — Архітектура</div>
+  <a href="#s1"><span class="toc-num">01</span> Як комп'ютер «читає» текст</a>
+  <a href="#s2"><span class="toc-num">02</span> Увага — серце трансформера</a>
+  <a href="#s3"><span class="toc-num">03</span> Як шари складаються разом</a>
+  <a href="#s4"><span class="toc-num">04</span> Як модель генерує текст</a>
+  <div class="toc-part">Частина II — Тренування</div>
+  <a href="#s5"><span class="toc-num">05</span> Задача: вгадати наступне слово</a>
+  <a href="#s6"><span class="toc-num">06</span> Функція втрат</a>
+  <a href="#s7"><span class="toc-num">07</span> Градієнтний спуск</a>
+  <a href="#s8"><span class="toc-num">08</span> Зворотне поширення</a>
+  <a href="#s9"><span class="toc-num">09</span> Як loss падає з часом</a>
+  <div class="toc-part">Частина III — Fine-tuning</div>
+  <a href="#s10"><span class="toc-num">10</span> Від тексту до асистента (SFT)</a>
+  <a href="#s11"><span class="toc-num">11</span> RLHF: навчання з відгуків людей</a>
+  <a href="#s12"><span class="toc-num">12</span> LoRA: ефективна адаптація</a>
+  <div class="toc-part">Частина IV — Інференс та оптимізація</div>
+  <a href="#s13"><span class="toc-num">13</span> Токенізація (BPE)</a>
+  <a href="#s14"><span class="toc-num">14</span> KV-кеш: чому генерація прискорюється</a>
+  <a href="#s15"><span class="toc-num">15</span> Квантизація: стиснення моделі</a>
+  <div class="toc-part">Частина V — Контекст та масштаб</div>
+  <a href="#s16"><span class="toc-num">16</span> Позиційне кодування (RoPE)</a>
+  <a href="#s17"><span class="toc-num">17</span> Контекстне вікно</a>
+  <a href="#s18"><span class="toc-num">18</span> Scaling laws: закони масштабу</a>
+  <a href="#s19"><span class="toc-num">19</span> Mixture of Experts (MoE)</a>
+  <div class="toc-part">Частина VI — Застосування</div>
+  <a href="#s20"><span class="toc-num">20</span> Prompt engineering</a>
+  <a href="#s21"><span class="toc-num">21</span> Галюцинації</a>
+  <a href="#s22"><span class="toc-num">22</span> RAG: пошук знань</a>
+  <a href="#s23"><span class="toc-num">23</span> Агенти та інструменти</a>
+</nav>
+
+<!-- ============================================================ -->
+<!-- PART I -->
+<!-- ============================================================ -->
+<div class="part-heading">Частина I — Архітектура</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 1: EMBEDDINGS -->
+<!-- ============================================================ -->
+<h2 id="s1"><span class="step-num">1</span> Як комп'ютер «читає» текст</h2>
+<p>Модель не розуміє букви — вона працює тільки з числами. Тому перший крок — розбити текст на шматочки (токени) і перетворити кожен на набір чисел (вектор). Цей набір чисел називається <strong>ембедінг</strong> — він кодує значення слова.</p>
+<p>Уяви, що кожне слово — це точка у великому просторі. Слова зі схожим значенням опиняються поруч: «кіт» і «собака» будуть близько, а «кіт» і «математика» — далеко.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — простір ембедінгів</div>
+  <canvas id="emb" height="380" style="width:100%;cursor:grab"></canvas>
+  <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:0.8rem;color:var(--text2)">
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#7F77DD;vertical-align:middle;margin-right:4px"></span>Тварини</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#1D9E75;vertical-align:middle;margin-right:4px"></span>Їжа</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#D85A30;vertical-align:middle;margin-right:4px"></span>Наука</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#888780;vertical-align:middle;margin-right:4px"></span>Інше</span>
+  </div>
+  <div class="hint">Перетягуйте мишкою, щоб обертати простір</div>
+</div>
+
+<p>Ембедінг-вектор для «кота» може мати 4096 чисел — тут ми спрощено показуємо це у 3D. Але принцип той самий: модель «розуміє» схожість через відстань між точками.</p>
+
+<!-- ============================================================ -->
+<!-- SECTION 2: ATTENTION -->
+<!-- ============================================================ -->
+<h2 id="s2"><span class="step-num">2</span> Увага (Attention) — серце трансформера</h2>
+<p>Коли ти читаєш речення «Кіт сів на килимок, бо <strong>він</strong> був м'яким», ти одразу розумієш, що «він» — це килимок. Модель робить це через механізм <strong>уваги</strong>: кожне слово «дивиться» на всі інші і вирішує, які з них для нього важливі.</p>
+<p>Технічно: кожен токен перетворюється на три вектори — Query (запитання), Key (ключ) і Value (значення). Query одного токена множиться на Key кожного іншого, і результат показує, наскільки вони пов'язані.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — Self-Attention</div>
+  <div id="attn-top" style="display:flex;justify-content:center;gap:8px;margin:12px 0;flex-wrap:wrap"></div>
+  <canvas id="attnCv" height="180" style="width:100%;display:block"></canvas>
+  <div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text2);text-align:center;margin:10px 0">score(i,j) = Query<sub>i</sub> · Key<sub>j</sub> / √d</div>
+  <div id="attn-bot" style="display:flex;justify-content:center;gap:8px;margin:12px 0;flex-wrap:wrap"></div>
+  <div class="hint">Натисніть на слово зверху, щоб побачити його увагу до інших</div>
+</div>
+
+<p>Натисни на слово «він» — побачиш, що найбільша увага (42%) йде до «килимок». Модель сама навчилася, що займенник відноситься саме до килимка.</p>
+<p>Формула: скалярний добуток двох векторів, поділений на √d (розмірність вектора). Потім усі оцінки перетворюються на відсотки через функцію softmax (щоб сума дорівнювала 100%).</p>
+
+<!-- ============================================================ -->
+<!-- SECTION 3: LAYER STACK -->
+<!-- ============================================================ -->
+<h2 id="s3"><span class="step-num">3</span> Як шари складаються разом</h2>
+<p>Один шар уваги — це лише початок. У реальній моделі таких шарів десятки, а у великих LLM — часто багато десятків. Кожен шар «розуміє» щось нове: перші ловлять граматику, середні — значення, останні — складніші залежності, логіку та факти.</p>
+
+<div class="widget-card" style="text-align:center">
+  <div class="widget-label">Діаграма — стек шарів трансформера</div>
+  <svg id="layerSvg" width="100%" viewBox="0 0 680 620" style="max-width:500px"></svg>
+</div>
+
+<p>Дані рухаються знизу вгору: ембедінги входять у перший шар, проходять через увагу (слова обмінюються інформацією), потім через нейромережу (кожен токен окремо обробляє зібрану інформацію), і так далі через усі шари.</p>
+
+<p>Але що всередині цих шарів? Кожен шар — це набір <strong>параметрів</strong>: звичайних десяткових чисел на кшталт <code>0.00142</code> або <code>-0.0538</code>. На початку вони випадкові, а під час тренування модель підбирає кожне число так, щоб краще передбачувати наступне слово. Саме ці числа і є «знаннями» моделі.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — звідки беруться мільярди параметрів</div>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;font-size:0.85rem;color:var(--text2)">
+    <span>Розмір моделі:</span>
+    <div id="param-tabs" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+  </div>
+  <div id="param-breakdown" style="display:flex;flex-direction:column;gap:6px"></div>
+  <div style="display:flex;gap:12px;margin-top:14px">
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Шарів</div>
+      <div id="param-layers" style="font-size:1.1rem;font-weight:500;margin-top:2px">—</div>
+    </div>
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Розмір вектора</div>
+      <div id="param-dim" style="font-size:1.1rem;font-weight:500;margin-top:2px;color:var(--purple)">—</div>
+    </div>
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Всього параметрів</div>
+      <div id="param-total" style="font-size:1.1rem;font-weight:500;margin-top:2px;color:var(--teal)">—</div>
+    </div>
+  </div>
+  <div class="hint">Обери розмір моделі — побачиш, з чого складаються мільярди параметрів</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 4: TEXT GENERATION -->
+<!-- ============================================================ -->
+<h2 id="s4"><span class="step-num">4</span> Як модель генерує текст</h2>
+<p>Після всіх шарів модель отримує фінальний вектор для останнього токена. Цей вектор перетворюється на числові оцінки — <strong>логіти (logits)</strong> — для кожного токена у <strong>словнику (vocabulary)</strong> моделі (30–100 тисяч токенів). Потім функція <strong>softmax</strong> перетворює логіти на <strong>розподіл ймовірностей</strong>: кожен токен отримує значення від 0 до 1, а сума всіх дорівнює 1. З цього розподілу модель обирає наступний токен — і повторює процес знову і знову.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — генерація тексту</div>
+  <div id="gen-prompt" style="padding:12px 16px;border-radius:var(--radius-sm);border:0.5px solid var(--border);background:var(--bg);font-size:0.95rem;line-height:1.6;min-height:40px;margin-bottom:12px">Сонце сходить над</div>
+  <div id="gen-bars-label" style="font-size:0.75rem;color:var(--text3);margin-bottom:6px">Top-k кандидати з розподілу ймовірностей (після softmax):</div>
+  <div id="gen-bars"></div>
+  <div style="display:flex;align-items:center;gap:12px;margin-top:10px;font-size:0.85rem;color:var(--text2)">
+    <span>Температура:</span>
+    <input type="range" id="gen-temp" min="1" max="20" value="7" step="1" style="flex:1">
+    <span id="gen-tval">0.7</span>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:10px">
+    <button onclick="doGenerate()">Згенерувати наступне слово</button>
+    <button onclick="doGenReset()" style="background:var(--bg);color:var(--text2);border:0.5px solid var(--border)">Скинути</button>
+  </div>
+</div>
+
+<p>Повзунок «Температура» регулює випадковість: при низькій (0.1) модель майже завжди вибирає найімовірніше слово, при високій (2.0) — вибір стає «креативнішим».</p>
+
+<div class="summary-box">
+  <strong>Підсумок частини I:</strong> Трансформер бере текст → розбиває на токени → перетворює на числа (ембедінги) → пропускає через десятки шарів уваги → на виході отримує ймовірність кожного можливого наступного слова → вибирає одне й повторює.
+</div>
+
+<!-- ============================================================ -->
+<!-- PART II -->
+<!-- ============================================================ -->
+<div class="part-heading">Частина II — Тренування</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 5: NEXT TOKEN PREDICTION -->
+<!-- ============================================================ -->
+<h2 id="s5"><span class="step-num">5</span> Задача: вгадати наступне слово</h2>
+<p>Тренування трансформера зводиться до однієї простої гри: модель бачить початок речення і намагається вгадати наступне слово. На старті вона вгадує випадково. Але після кожної спроби їй кажуть правильну відповідь, і вона трохи коригує себе.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — вгадай наступне слово</div>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;font-size:0.85rem;color:var(--text2)">
+    <span>Прогрес тренування:</span>
+    <div style="flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden"><div id="ntp-fill" style="height:100%;border-radius:4px;transition:width .4s;background:var(--purple);width:0%"></div></div>
+    <span id="ntp-label">0/5</span>
+  </div>
+  <div id="ntp-card"></div>
+  <div id="ntp-fb" style="font-size:0.85rem;margin-top:8px;min-height:20px;line-height:1.5"></div>
+  <div style="display:flex;justify-content:flex-end;margin-top:8px"><button id="ntp-next" onclick="ntpNext()" style="display:none">Наступний приклад →</button></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 6: LOSS FUNCTION -->
+<!-- ============================================================ -->
+<h2 id="s6"><span class="step-num">6</span> Функція втрат (Loss)</h2>
+<p>Після кожного передбачення потрібно виміряти, наскільки модель помилилась. Якщо правильне слово — «Київ», а модель дала йому ймовірність 80% — втрата мала. Якщо лише 2% — втрата величезна.</p>
+<p>Математично це від'ємний логарифм ймовірності правильної відповіді: <code>Loss = -log(p)</code>.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — функція втрат</div>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;font-size:0.85rem;color:var(--text2)">
+    <span>Ймовірність правильного слова:</span>
+    <input type="range" id="loss-prob" min="1" max="99" value="50" step="1" style="flex:1">
+    <span id="loss-pval" style="min-width:36px;text-align:right;font-weight:500">50%</span>
+  </div>
+  <div style="display:flex;gap:12px;margin:12px 0">
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:12px;text-align:center">
+      <div style="font-size:0.75rem;color:var(--text3)">Loss = −log(p)</div>
+      <div id="loss-val" style="font-size:1.4rem;font-weight:500;margin-top:4px">0.69</div>
+    </div>
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:12px;text-align:center">
+      <div style="font-size:0.75rem;color:var(--text3)">Оцінка</div>
+      <div id="loss-verdict" style="font-size:0.9rem;font-weight:500;margin-top:8px">Середньо</div>
+    </div>
+  </div>
+  <div style="position:relative;width:100%;height:250px"><canvas id="lossChart"></canvas></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 7: GRADIENT DESCENT -->
+<!-- ============================================================ -->
+<h2 id="s7"><span class="step-num">7</span> Градієнтний спуск</h2>
+<p>Як модель виправляє помилки? У неї мільярди чисел-параметрів (ваги). Уяви, що loss — це висота гірського ландшафту, а параметри — координати на карті. Задача: знайти найнижчу точку. Модель робить маленькі кроки «вниз по схилу» — це і є <strong>градієнтний спуск</strong>.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — градієнтний спуск</div>
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;font-size:0.85rem;color:var(--text2);margin-bottom:6px">
+    <label style="display:flex;align-items:center;gap:6px">Крок (learning rate): <input type="range" id="gd-lr" min="1" max="30" value="8" step="1" style="width:120px"><span id="gd-lrv">0.08</span></label>
+    <button onclick="gdStart()">Запустити спуск</button>
+    <button onclick="gdReset()">Скинути</button>
+  </div>
+  <div style="display:flex;gap:14px;margin:8px 0;font-size:0.85rem;color:var(--text2)">
+    Крок: <strong id="gd-step">0</strong> &nbsp; Loss: <strong id="gd-loss">—</strong> &nbsp; Градієнт: <strong id="gd-grad">—</strong>
+  </div>
+  <canvas id="gdCv" height="320" style="width:100%;display:block;border-radius:var(--radius-sm);cursor:pointer"></canvas>
+  <div class="hint">Клікніть на графік, щоб поставити кульку в іншу точку</div>
+</div>
+
+<p><strong>Learning rate (швидкість навчання)</strong> — це розмір кроку, яким модель рухається до мінімуму на кожній ітерації. В інтерактиві це буквально довжина стрілки. Занадто великий — кулька «перестрибує» мінімум і не збігається. Занадто малий — навчання працює, але дуже повільно. Підбір оптимального learning rate — одне з ключових рішень при тренуванні моделі. У реальності тут не одна крива, а ландшафт у мільярдах вимірів.</p>
+
+<!-- ============================================================ -->
+<!-- SECTION 8: BACKPROPAGATION -->
+<!-- ============================================================ -->
+<h2 id="s8"><span class="step-num">8</span> Зворотне поширення (Backpropagation)</h2>
+<p>Як дізнатись градієнт для <strong>кожного</strong> з мільярдів параметрів? Помилка «протікає назад» від виходу до входу через усі шари. Кожен параметр дізнається, наскільки саме він відповідальний за помилку — це <strong>правило ланцюжка</strong> (chain rule).</p>
+
+<div class="widget-card">
+  <div class="widget-label">Покроково — цикл тренування</div>
+  <div id="bp-pills" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap"></div>
+  <div id="bp-desc" style="font-size:0.9rem;color:var(--text);line-height:1.6;margin-bottom:8px;min-height:48px"></div>
+  <svg id="bpSvg" width="100%" viewBox="0 0 680 260"></svg>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 9: TRAINING CURVE -->
+<!-- ============================================================ -->
+<h2 id="s9"><span class="step-num">9</span> Як loss падає з часом</h2>
+<p>Модель обробляє пакети тексту, і після кожного кроку loss трохи зменшується. На початку модель генерує сміття, через тижні — зв'язний текст, через місяці — розумні відповіді.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — крива тренування</div>
+  <div style="position:relative;width:100%;height:240px"><canvas id="tlcChart"></canvas></div>
+  <div style="display:flex;gap:0;border-radius:var(--radius-sm);overflow:hidden;margin:10px 0;height:30px">
+    <div id="ph0" style="flex:1;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#fff;font-weight:500;background:#E24B4A;transition:opacity .3s">Шум</div>
+    <div id="ph1" style="flex:1;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#fff;font-weight:500;background:#BA7517;transition:opacity .3s">Граматика</div>
+    <div id="ph2" style="flex:1;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#fff;font-weight:500;background:#1D9E75;transition:opacity .3s">Текст</div>
+    <div id="ph3" style="flex:1;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#fff;font-weight:500;background:#7F77DD;transition:opacity .3s">Знання</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;font-size:0.85rem;color:var(--text2);margin:8px 0">
+    <span>Прогрес:</span>
+    <input type="range" id="tlc-epoch" min="0" max="100" value="0" step="1" style="flex:1">
+    <span id="tlc-lbl" style="min-width:50px;text-align:right">0%</span>
+  </div>
+  <div id="tlc-sample" style="background:var(--bg);border-radius:var(--radius-sm);padding:12px 16px;font-size:0.85rem;color:var(--text2);line-height:1.6"></div>
+</div>
+
+<div class="summary-box">
+  <strong>Підсумок частини II:</strong> Дані (трильйони слів) → задача (вгадати наступне слово) → loss (−log ймовірності) → backpropagation (помилка назад через шари) → оновлення ваг (крок проти градієнта) → повтор мільйони разів.
+</div>
+
+<!-- ============================================================ -->
+<!-- PART III -->
+<!-- ============================================================ -->
+<div class="part-heading">Частина III — Fine-tuning</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 10: SFT -->
+<!-- ============================================================ -->
+<h2 id="s10"><span class="step-num">10</span> Від тексту до асистента (SFT)</h2>
+<p>Після базового тренування модель вміє продовжувати текст — але не вміє <strong>відповідати на запитання</strong>. Якщо написати «Яка столиця Франції?», вона може продовжити: «А яка столиця Німеччини? А Іспанії?» — бо в інтернеті так часто пишуть.</p>
+<p><strong>Supervised Fine-Tuning (SFT)</strong> — це коли моделі показують тисячі прикладів «запитання → правильна відповідь», написаних людьми. Вона вчиться відповідати замість того, щоб просто продовжувати.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — до і після SFT</div>
+  <div id="sft-tabs" style="display:flex;gap:6px;margin-bottom:14px"></div>
+  <div id="sft-prompt" style="background:var(--bg);border-radius:var(--radius-sm);padding:12px 16px;font-size:0.9rem;margin-bottom:10px"></div>
+  <div style="display:flex;gap:12px;margin-bottom:6px">
+    <div id="sft-base" style="flex:1;border-radius:var(--radius-sm);padding:14px 16px;font-size:0.85rem;line-height:1.6;border:0.5px solid var(--border);transition:all .3s">
+      <div style="font-size:0.7rem;font-family:var(--font-mono);color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Базова модель</div>
+      <div id="sft-base-text"></div>
+    </div>
+    <div id="sft-tuned" style="flex:1;border-radius:var(--radius-sm);padding:14px 16px;font-size:0.85rem;line-height:1.6;border:0.5px solid var(--border);transition:all .3s">
+      <div style="font-size:0.7rem;font-family:var(--font-mono);color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Після SFT</div>
+      <div id="sft-tuned-text"></div>
+    </div>
+  </div>
+  <div class="hint">Натисніть на приклади вгорі, щоб побачити різницю</div>
+</div>
+
+<p>Зверни увагу: базова модель знає відповідь (вона засвоїла факти під час тренування) — але не знає <em>формату</em>. SFT вчить саме формату: відповідай коротко, структуровано, корисно.</p>
+
+<!-- ============================================================ -->
+<!-- SECTION 11: RLHF -->
+<!-- ============================================================ -->
+<h2 id="s11"><span class="step-num">11</span> RLHF: навчання з відгуків людей</h2>
+<p>Навіть після SFT модель може відповідати токсично, вигадувати факти або бути занадто багатослівною. <strong>RLHF</strong> (Reinforcement Learning from Human Feedback) — це коли люди порівнюють варіанти відповідей і вибирають кращий. З цих оцінок модель вчиться, що «добре», а що «погано».</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — оціни як людина</div>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;font-size:0.85rem;color:var(--text2)">
+    <span>Прогрес:</span>
+    <div style="flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden"><div id="rlhf-fill" style="height:100%;border-radius:4px;transition:width .4s;background:var(--teal);width:0%"></div></div>
+    <span id="rlhf-label">0/4</span>
+  </div>
+  <div id="rlhf-prompt" style="background:var(--bg);border-radius:var(--radius-sm);padding:10px 16px;font-size:0.9rem;margin-bottom:12px;font-weight:500"></div>
+  <div style="display:flex;gap:12px" id="rlhf-pair"></div>
+  <div id="rlhf-fb" style="font-size:0.85rem;margin-top:10px;min-height:20px;line-height:1.5"></div>
+  <div style="display:flex;justify-content:flex-end;margin-top:8px"><button id="rlhf-next" onclick="rlhfNext()" style="display:none">Наступний приклад →</button></div>
+</div>
+
+<p>Процес RLHF: 1) зібрати пари відповідей, 2) люди вибирають кращу, 3) натренувати <strong>reward model</strong> (модель оцінки), 4) оптимізувати LLM, щоб вона отримувала високі оцінки від reward model.</p>
+
+<!-- ============================================================ -->
+<!-- SECTION 12: LoRA -->
+<!-- ============================================================ -->
+<h2 id="s12"><span class="step-num">12</span> LoRA: ефективна адаптація</h2>
+<p>Повний fine-tuning змінює <strong>всі</strong> мільярди параметрів — це дорого і повільно. <strong>LoRA</strong> (Low-Rank Adaptation) — розумний трюк: заморозити основну модель і додати маленькі матриці-адаптери. Замість оновлення величезної матриці W, додаємо добуток двох маленьких: ΔW = A × B.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — LoRA: заморожена модель + адаптер</div>
+  <svg id="loraSvg" width="100%" viewBox="0 0 680 310" style="max-width:600px;display:block;margin:0 auto"></svg>
+  <div style="display:flex;align-items:center;gap:12px;margin-top:12px;font-size:0.85rem;color:var(--text2)">
+    <span>Ранг (r):</span>
+    <input type="range" id="lora-rank" min="1" max="64" value="8" step="1" style="flex:1">
+    <span id="lora-rval" style="min-width:30px;text-align:right;font-weight:500">8</span>
+  </div>
+  <div style="display:flex;gap:12px;margin-top:10px">
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Параметрів у W</div>
+      <div id="lora-full" style="font-size:1.1rem;font-weight:500;margin-top:2px">—</div>
+    </div>
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Параметрів у LoRA</div>
+      <div id="lora-params" style="font-size:1.1rem;font-weight:500;margin-top:2px;color:var(--teal)">—</div>
+    </div>
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Економія</div>
+      <div id="lora-saving" style="font-size:1.1rem;font-weight:500;margin-top:2px;color:var(--purple)">—</div>
+    </div>
+  </div>
+  <div class="hint">Рухайте повзунок, щоб змінити ранг — баланс між якістю та ефективністю</div>
+</div>
+
+<p>При ранзі r=8 замість 4 мільйонів параметрів оновлюємо лише ~32 тисячі — це в <strong>125 разів менше</strong>. Якість при цьому залишається близькою до повного fine-tuning. Саме тому LoRA став стандартом для адаптації великих моделей.</p>
+
+<div class="summary-box">
+  <strong>Підсумок частини III:</strong> Базова модель (pre-trained) → SFT (вчиться формату відповідей на прикладах людей) → RLHF (вчиться з порівнянь «краща/гірша відповідь») → LoRA (ефективна адаптація без зміни всіх ваг).<br><br>
+  Разом ці три етапи перетворюють «генератор тексту» на корисного, безпечного AI-асистента.
+</div>
+
+<!-- ============================================================ -->
+<!-- PART IV -->
+<!-- ============================================================ -->
+<div class="part-heading">Частина IV — Інференс та оптимізація</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 13: TOKENIZATION / BPE -->
+<!-- ============================================================ -->
+<h2 id="s13"><span class="step-num">13</span> Токенізація (BPE)</h2>
+<p>Модель не бачить букв і слів — вона працює з <strong>токенами</strong>. Токенізатор розбиває текст на шматочки за алгоритмом <strong>BPE</strong> (Byte Pair Encoding): спочатку кожна буква — окремий токен, потім найчастіші пари зливаються. Результат: часті слова = 1 токен, рідкісні = кілька.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — як токенізатор бачить текст</div>
+  <div id="tok-tabs" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap"></div>
+  <div id="tok-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin:12px 0;min-height:38px"></div>
+  <div style="display:flex;gap:12px;margin-top:10px">
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Символів</div>
+      <div id="tok-chars" style="font-size:1.1rem;font-weight:500;margin-top:2px">—</div>
+    </div>
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Токенів</div>
+      <div id="tok-count" style="font-size:1.1rem;font-weight:500;margin-top:2px;color:var(--purple)">—</div>
+    </div>
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Символів / токен</div>
+      <div id="tok-ratio" style="font-size:1.1rem;font-weight:500;margin-top:2px;color:var(--teal)">—</div>
+    </div>
+  </div>
+  <div id="tok-insight" style="font-size:0.85rem;color:var(--text2);margin-top:10px;line-height:1.5"></div>
+  <div class="hint">Натисніть на приклад — побачите, як модель «бачить» текст. <a href="https://platform.openai.com/tokenizer" target="_blank" rel="noopener" style="color:var(--purple)">Спробуйте свій текст →</a></div>
+</div>
+
+<p>Зверни увагу: «Hello world» — лише 2 токени, а «Привіт світ» — цілих 7. Тому LLM «витрачає» більше ресурсів на неанглійський текст — одна з причин, чому моделі краще працюють англійською.</p>
+
+<!-- ============================================================ -->
+<!-- SECTION 14: KV-CACHE -->
+<!-- ============================================================ -->
+<h2 id="s14"><span class="step-num">14</span> KV-кеш: чому генерація прискорюється</h2>
+<p>Коли модель генерує текст, вона щоразу рахує attention для <strong>всіх</strong> попередніх токенів. Але Key і Value для вже згенерованих токенів не змінюються! <strong>KV-кеш</strong> зберігає їх — і на кожному кроці рахується attention тільки для нового токена.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — генерація з KV-кешем</div>
+  <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center">
+    <button id="kv-step-btn" onclick="kvStep()">Наступний токен →</button>
+    <button onclick="kvReset()">Скинути</button>
+    <span id="kv-status" style="font-size:0.8rem;color:var(--text3);margin-left:auto"></span>
+  </div>
+  <div id="kv-grid" style="overflow-x:auto"></div>
+  <div id="kv-step-info" style="font-size:0.85rem;color:var(--text2);margin-top:10px;line-height:1.5;text-align:center"></div>
+  <div style="display:flex;gap:12px;margin-top:10px">
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Всього без кешу</div>
+      <div id="kv-no-cache" style="font-size:1.1rem;font-weight:500;margin-top:2px;color:var(--coral)">—</div>
+    </div>
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Всього з кешем</div>
+      <div id="kv-with-cache" style="font-size:1.1rem;font-weight:500;margin-top:2px;color:var(--teal)">—</div>
+    </div>
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Прискорення</div>
+      <div id="kv-saving" style="font-size:1.1rem;font-weight:500;margin-top:2px;color:var(--purple)">—</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:14px;margin-top:10px;font-size:0.75rem;color:var(--text3)">
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#1D9E75;vertical-align:middle;margin-right:4px"></span>кешовано (K,V)</span>
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#7F77DD;vertical-align:middle;margin-right:4px"></span>нове обчислення</span>
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--bg3);vertical-align:middle;margin-right:4px"></span>ще не згенеровано</span>
+  </div>
+  <div class="hint">Натискайте «Наступний токен» і спостерігайте, як кеш росте</div>
+</div>
+
+<p>Чим довший текст, тим більша перевага кешу: для 100 токенів без кешу потрібно понад 170 тисяч обчислень attention, а з кешем — лише ~5 тисяч. Прискорення в <strong>30+ разів</strong>. Ціна — пам'ять під кеш, яка зростає з довжиною тексту.</p>
+
+<!-- ============================================================ -->
+<!-- SECTION 15: QUANTIZATION -->
+<!-- ============================================================ -->
+<h2 id="s15"><span class="step-num">15</span> Квантизація: стиснення моделі</h2>
+<p>Кожен параметр моделі — число з плаваючою комою. При тренуванні використовують 16-бітну точність (FP16). <strong>Квантизація</strong> — це зменшення точності до 8, 4, або навіть 2 біт. Менше біт = менше пам'яті = швидший інференс, але з втратою якості.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — квантизація ваг</div>
+  <div id="q-tabs" style="display:flex;gap:6px;margin-bottom:14px"></div>
+  <div style="position:relative;width:100%;height:200px"><canvas id="qChart"></canvas></div>
+  <div style="display:flex;gap:12px;margin-top:12px">
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Розмір моделі (7B)</div>
+      <div id="q-size" style="font-size:1.1rem;font-weight:500;margin-top:2px">—</div>
+    </div>
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">RAM потрібно</div>
+      <div id="q-ram" style="font-size:1.1rem;font-weight:500;margin-top:2px;color:var(--purple)">—</div>
+    </div>
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Якість</div>
+      <div id="q-quality" style="font-size:1.1rem;font-weight:500;margin-top:2px">—</div>
+    </div>
+  </div>
+  <div id="q-example" style="background:var(--bg);border-radius:var(--radius-sm);padding:12px 16px;font-size:0.85rem;color:var(--text2);line-height:1.6;margin-top:12px"></div>
+  <div class="hint">Оберіть точність — побачите як змінюється розмір та якість</div>
+</div>
+
+<p>На практиці 4-бітна квантизація (Q4) — золота середина: модель на 7B параметрів займає ~4 ГБ замість 14 ГБ, а якість падає лише на 1–3%. Саме тому моделі на телефонах і ноутбуках — це майже завжди квантизовані версії.</p>
+
+<div class="summary-box">
+  <strong>Підсумок частини IV:</strong> Текст розбивається на токени (BPE) → під час генерації KV-кеш зберігає вже обчислені ключі/значення (прискорення в десятки разів) → квантизація зменшує точність ваг (16→4 біт), стискаючи модель у 4 рази майже без втрати якості.
+</div>
+
+<!-- ============================================================ -->
+<!-- PART V -->
+<!-- ============================================================ -->
+<div class="part-heading">Частина V — Контекст та масштаб</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 16: POSITIONAL ENCODING / RoPE -->
+<!-- ============================================================ -->
+<h2 id="s16"><span class="step-num">16</span> Позиційне кодування (RoPE)</h2>
+<p>Attention сам по собі не знає порядку слів — для нього «кіт з'їв рибу» і «рибу з'їв кіт» — просто однаковий набір токенів. Потрібен спосіб закодувати позицію кожного слова.</p>
+<p><strong>RoPE</strong> (Rotary Position Embedding) робить це елегантно: уяви, що вектор кожного токена — це стрілка компаса. RoPE <strong>обертає</strong> цю стрілку на кут, пропорційний позиції: слово на позиції 0 — вказує вверх, на позиції 3 — трохи вправо, на позиції 10 — значно вправо.</p>
+<p>Чому саме обертання? Коли модель обчислює attention між двома словами, вона порівнює їхні вектори (скалярний добуток). Оскільки вектори обернені, результат залежить від <strong>різниці кутів</strong> — тобто від <strong>відстані</strong> між словами. Близькі слова → схожий кут → висока увага. Далекі → різний кут → нижча увага. І головне: слова на позиціях 3 і 5 мають <em>ту саму</em> різницю кутів, що й слова на позиціях 100 і 102 — значення має лише відносна відстань.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — як обертання кодує відстань</div>
+  <div id="rope-sentence" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:14px"></div>
+  <div style="display:flex;gap:20px;margin-bottom:12px;flex-wrap:wrap">
+    <label style="display:flex;align-items:center;gap:8px;font-size:0.85rem;color:var(--text2)">
+      <span style="color:#7F77DD;font-weight:600">Слово A</span> позиція:
+      <input type="range" id="rope-posA" min="0" max="15" value="2" step="1" style="width:110px">
+      <span id="rope-posA-val" style="font-family:var(--font-mono);min-width:18px;font-weight:500">2</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:8px;font-size:0.85rem;color:var(--text2)">
+      <span style="color:#1D9E75;font-weight:600">Слово B</span> позиція:
+      <input type="range" id="rope-posB" min="0" max="15" value="5" step="1" style="width:110px">
+      <span id="rope-posB-val" style="font-family:var(--font-mono);min-width:18px;font-weight:500">5</span>
+    </label>
+  </div>
+  <svg id="ropeSvg" width="100%" viewBox="0 0 540 230" style="display:block"></svg>
+  <div style="display:flex;gap:12px;margin-top:10px">
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Відстань</div>
+      <div id="rope-dist" style="font-size:1.1rem;font-weight:500;margin-top:2px">—</div>
+    </div>
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Кут між векторами</div>
+      <div id="rope-angle" style="font-size:1.1rem;font-weight:500;margin-top:2px;color:var(--purple)">—</div>
+    </div>
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Сила уваги</div>
+      <div id="rope-att" style="font-size:1.1rem;font-weight:500;margin-top:2px;color:var(--teal)">—</div>
+    </div>
+  </div>
+  <div id="rope-insight" style="font-size:0.85rem;color:var(--text2);text-align:center;margin-top:10px;min-height:20px"></div>
+  <div class="hint">Натисни на слова або рухай повзунки — побач, як відстань між словами визначає силу уваги</div>
+</div>
+
+<p>Реальний RoPE використовує різні швидкості обертання для різних вимірів вектора — одні кодують близькі зв'язки, інші — далекі. Це дозволяє моделі узагальнювати на довші контексти, ніж бачила під час тренування.</p>
+
+<!-- ============================================================ -->
+<!-- SECTION 17: CONTEXT WINDOW -->
+<!-- ============================================================ -->
+<h2 id="s17"><span class="step-num">17</span> Контекстне вікно</h2>
+<p><strong>Контекстне вікно (context window)</strong> — це максимальна кількість токенів, яку модель може «бачити» одночасно: і твій запит, і свою відповідь. Все, що не вміщується у вікно, модель просто не бачить — ніби читає книжку через вузьку щілину.</p>
+<p>Розмір вікна стрімко зростає: GPT-2 (2019) мав лише 1 024 токени, GPT-4 — до 128 000, а Claude та Gemini підтримують до 200 000–1 000 000 токенів. Але більше вікно — це більше обчислень: self-attention має складність <strong>O(n²)</strong> від довжини контексту.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — що вміщується в контекстне вікно</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px" id="ctx-tabs"></div>
+  <div id="ctx-bar-area" style="margin-bottom:12px"></div>
+  <div style="display:flex;gap:12px">
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Розмір вікна</div>
+      <div id="ctx-size" style="font-size:1.1rem;font-weight:500;margin-top:2px;color:var(--purple)">—</div>
+    </div>
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">≈ сторінок тексту</div>
+      <div id="ctx-pages" style="font-size:1.1rem;font-weight:500;margin-top:2px">—</div>
+    </div>
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">≈ годин аудіо</div>
+      <div id="ctx-audio" style="font-size:1.1rem;font-weight:500;margin-top:2px;color:var(--teal)">—</div>
+    </div>
+  </div>
+  <div class="hint">Обери модель — побачиш, скільки тексту вміщується в її контекстне вікно</div>
+</div>
+
+<p>Чому це важливо на практиці? Якщо ти вставляєш у запит довгий документ — він «з'їдає» частину вікна, і на відповідь залишається менше місця. А якщо розмова довга — старі повідомлення можуть «випасти» з контексту, і модель перестане на них спиратися. Саме тому чат-боти іноді «втрачають пам'ять» у довгих діалогах.</p>
+<p>Техніки розширення контексту: <strong>Sliding window attention</strong> обмежує увагу локальним вікном для кожного шару, зменшуючи складність. <strong>RoPE scaling</strong> дозволяє «розтягнути» позиційне кодування на довший контекст без повного перетренування. <strong>RAG</strong> (розділ 22) частково обходить обмеження вікна — замість вставки всього тексту, шукає лише релевантні фрагменти.</p>
+
+<!-- ============================================================ -->
+<!-- SECTION 18: SCALING LAWS -->
+<!-- ============================================================ -->
+<h2 id="s18"><span class="step-num">18</span> Scaling laws: закони масштабу</h2>
+<p>Одне з найважливіших відкриттів: якість моделі <strong>передбачувано</strong> зростає зі збільшенням трьох речей — кількості параметрів (N), обсягу даних (D) і обчислювальних ресурсів (C). Це — <strong>закони масштабу</strong> (scaling laws).</p>
+<p>Формула Chinchilla: <code>L ≈ A/N<sup>α</sup> + B/D<sup>β</sup> + L<sub>∞</sub></code>, де L — loss, N — параметри, D — токени даних. Кожен фактор дає свій внесок, і є «нередуковна» помилка L<sub>∞</sub>, яку не можна усунути навіть нескінченними ресурсами.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — scaling laws</div>
+  <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;font-size:0.85rem;color:var(--text2)">
+      <span style="min-width:130px">Параметри (N):</span>
+      <input type="range" id="sc-n" min="1" max="100" value="50" step="1" style="flex:1">
+      <span id="sc-nv" style="min-width:60px;text-align:right;font-weight:500;font-family:var(--font-mono);font-size:0.8rem">18B</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;font-size:0.85rem;color:var(--text2)">
+      <span style="min-width:130px">Дані (D):</span>
+      <input type="range" id="sc-d" min="1" max="100" value="50" step="1" style="flex:1">
+      <span id="sc-dv" style="min-width:60px;text-align:right;font-weight:500;font-family:var(--font-mono);font-size:0.8rem">178B tok</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;font-size:0.85rem;color:var(--text2)">
+      <span style="min-width:130px">Compute (C):</span>
+      <input type="range" id="sc-c" min="1" max="100" value="50" step="1" style="flex:1">
+      <span id="sc-cv" style="min-width:60px;text-align:right;font-weight:500;font-family:var(--font-mono);font-size:0.8rem">10²³ FLOP</span>
+    </div>
+  </div>
+  <div style="position:relative;width:100%;height:220px"><canvas id="scChart"></canvas></div>
+  <div style="display:flex;gap:12px;margin-top:10px">
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Прогнозований Loss</div>
+      <div id="sc-loss" style="font-size:1.2rem;font-weight:500;margin-top:2px;color:var(--purple)">—</div>
+    </div>
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Рівень</div>
+      <div id="sc-level" style="font-size:0.9rem;font-weight:500;margin-top:4px">—</div>
+    </div>
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Вузьке місце</div>
+      <div id="sc-bottleneck" style="font-size:0.9rem;font-weight:500;margin-top:4px">—</div>
+    </div>
+  </div>
+  <div class="hint">Рухайте повзунки — побачите, який фактор обмежує якість найбільше</div>
+</div>
+
+<p>Ключовий інсайт: немає сенсу збільшувати лише параметри, якщо бракує даних — і навпаки. Практичний висновок роботи Chinchilla: параметри й дані треба масштабувати збалансовано. Сучасні великі моделі часто тренують на трильйонах токенів, але точні числа для закритих систем зазвичай не розкривають.</p>
+
+<!-- ============================================================ -->
+<!-- SECTION 19: MoE -->
+<!-- ============================================================ -->
+<h2 id="s19"><span class="step-num">19</span> Mixture of Experts (MoE)</h2>
+<p>Звичайний трансформер активує <strong>всі</strong> параметри на кожному токені. <strong>MoE</strong> — це хитрий трюк: feed-forward шар замінюється на кілька «експертів» (окремих підмереж), і <strong>маршрутизатор</strong> (router) для кожного токена вибирає лише 1–2 з них.</p>
+<p>Результат: модель може мати 141 мільярд параметрів (як Mixtral 8x22B), але на кожному токені працюють лише ~39B — це майже в 4 рази менше. Швидкість як у маленької моделі, якість як у великої.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — маршрутизація токенів до експертів</div>
+  <div id="moe-tokens" style="display:flex;justify-content:center;gap:8px;margin:12px 0;flex-wrap:wrap"></div>
+  <svg id="moeSvg" width="100%" viewBox="0 0 680 300" style="display:block"></svg>
+  <div id="moe-stats" style="font-size:0.85rem;color:var(--text2);text-align:center;margin-top:8px;line-height:1.5"></div>
+  <div class="hint">Натисніть на токен — побачите, до яких експертів він маршрутизується</div>
+</div>
+
+<p>Кожен експерт спеціалізується: один краще працює з кодом, інший — з математикою, третій — з мовами. Маршрутизатор вчиться направляти кожен токен до найрелевантніших експертів. MoE став дуже важливим підходом у сучасних великих моделях, але точні архітектури комерційних систем часто не розкриваються публічно.</p>
+
+<div class="summary-box">
+  <strong>Підсумок частини V:</strong> Позиційне кодування (RoPE) дозволяє моделі розрізняти порядок слів через «обертання» векторів → контекстне вікно визначає, скільки тексту модель бачить одночасно → scaling laws передбачують якість моделі від розміру, даних і compute → MoE дозволяє мати величезну модель, активуючи лише малу частину параметрів на кожному токені.
+</div>
+
+<!-- ============================================================ -->
+<!-- PART VI -->
+<!-- ============================================================ -->
+<div class="part-heading">Частина VI — Застосування</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 20: PROMPT ENGINEERING -->
+<!-- ============================================================ -->
+<h2 id="s20"><span class="step-num">20</span> Prompt engineering</h2>
+<p>Модель — це інструмент, і результат залежить від того, <strong>як</strong> ти формулюєш запит. Prompt engineering — набір технік, що дозволяють отримати кращі відповіді без зміни самої моделі.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — техніки промптингу</div>
+  <div id="pe-tabs" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap"></div>
+  <div style="display:flex;gap:12px">
+    <div style="flex:1">
+      <div style="font-size:0.7rem;font-family:var(--font-mono);color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Промпт</div>
+      <div id="pe-prompt" style="background:var(--bg);border-radius:var(--radius-sm);padding:14px 16px;font-size:0.85rem;line-height:1.6;border:1px solid var(--border);min-height:120px;white-space:pre-wrap"></div>
+    </div>
+    <div style="flex:1">
+      <div style="font-size:0.7rem;font-family:var(--font-mono);color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Відповідь моделі</div>
+      <div id="pe-response" style="background:var(--bg);border-radius:var(--radius-sm);padding:14px 16px;font-size:0.85rem;line-height:1.6;border:1px solid var(--teal);min-height:120px;white-space:pre-wrap"></div>
+    </div>
+  </div>
+  <div id="pe-explain" style="font-size:0.85rem;color:var(--text2);margin-top:12px;line-height:1.5"></div>
+  <div class="hint">Натисніть на техніку — побачите, як змінюється промпт і якість відповіді</div>
+</div>
+
+<p>Порада: комбінуй техніки. System prompt задає роль, few-shot — формат, а покрокові інструкції іноді допомагають у складніших задачах. Це працює, бо модель генерує «продовження» промпту — і чим кращий контекст ти даси, тим кориснішим зазвичай буде результат.</p>
+
+<!-- ============================================================ -->
+<!-- SECTION 21: HALLUCINATIONS -->
+<!-- ============================================================ -->
+<h2 id="s21"><span class="step-num">21</span> Галюцинації</h2>
+<p>Модель не зберігає знання як перевірену енциклопедію — вона генерує <strong>найімовірніше продовження</strong> тексту. Іноді це продовження виглядає правдоподібно, але містить вигадані або змішані факти. Це називають <strong>галюцинацією</strong> (hallucination): модель впевнено видає неправду, бо статистично ці слова добре пасують одне до одного.</p>
+<p>Чому це відбувається? Модель оптимізована на <em>правдоподібність</em>, а не на <em>гарантовану правдивість</em>. Вона не має вбудованого механізму фактчекінгу і не перевіряє кожну тезу сама по собі — просто продовжує текст найімовірнішим чином.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — знайди галюцинацію</div>
+  <div style="font-size:0.85rem;color:var(--text2);margin-bottom:8px">Модель відповіла на запитання. Одне з тверджень — галюцинація. Яке саме? Обери одне.</div>
+  <div id="hall-question" style="padding:10px 16px;border-radius:var(--radius-sm);background:var(--bg);font-size:0.9rem;font-weight:500;margin-bottom:12px;border:1px solid var(--border)"></div>
+  <div id="hall-cards"></div>
+  <div id="hall-result" style="font-size:0.9rem;font-weight:500;text-align:center;margin-top:12px;min-height:24px"></div>
+  <div style="display:flex;gap:12px;margin-top:10px">
+    <div style="flex:1;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+      <div style="font-size:0.7rem;color:var(--text3)">Рахунок</div>
+      <div id="hall-score" style="font-size:1.1rem;font-weight:500;margin-top:2px;color:var(--teal)">0 / 3</div>
+    </div>
+    <div style="flex:1;text-align:center">
+      <button id="hall-next-btn" onclick="hallReset()" style="margin-top:8px;background:var(--bg);color:var(--text2);border:0.5px solid var(--border)">Наступне запитання</button>
+    </div>
+  </div>
+  <div class="hint">Натисни на те твердження, яке вважаєш вигаданим</div>
+</div>
+
+<p>Як зменшити галюцинації: <strong>RAG</strong> (наступний розділ) дає моделі реальні документи; <strong>нижча температура</strong> іноді робить відповіді стриманішими; <strong>перевірка джерел</strong> і явне прохання позначати невпевненість допомагають виявляти ризиковані місця. Покрокові промпти можуть допомогти з міркуванням, але не гарантують фактичності. Жоден метод не усуває галюцинації повністю.</p>
+
+<!-- ============================================================ -->
+<!-- SECTION 22: RAG -->
+<!-- ============================================================ -->
+<h2 id="s22"><span class="step-num">22</span> RAG: пошук знань</h2>
+<p>Модель спирається лише на те, що бачила під час тренування, якщо не дати їй зовнішній контекст. Для свіжих або приватних даних використовують <strong>RAG</strong> (Retrieval-Augmented Generation): спочатку шукаються релевантні документи, потім вставляються у промпт як контекст.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — RAG крок за кроком</div>
+  <div id="rag-pills" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap"></div>
+  <svg id="ragSvg" width="100%" viewBox="0 0 700 280" style="display:block"></svg>
+  <div id="rag-desc" style="font-size:0.85rem;color:var(--text2);margin-top:10px;line-height:1.6;min-height:36px"></div>
+</div>
+
+<p>Без RAG модель частіше спирається лише на пам'ять параметрів і може вигадати відповідь. З RAG вона частіше спирається на реальні документи й може цитувати джерела, але відповідь усе одно варто перевіряти. Це дозволяє використовувати LLM для роботи з корпоративними базами знань, документацією, юридичними текстами.</p>
+
+<!-- ============================================================ -->
+<!-- SECTION 23: AGENTS & TOOLS -->
+<!-- ============================================================ -->
+<h2 id="s23"><span class="step-num">23</span> Агенти та інструменти</h2>
+<p>Сама по собі модель лише генерує текст. Але якщо дати їй <strong>інструменти</strong> (пошук, калькулятор, API, код) — вона стає <strong>агентом</strong>: аналізує задачу, вирішує який інструмент використати, викликає його, обробляє результат і продовжує.</p>
+
+<div class="widget-card">
+  <div class="widget-label">Інтерактив — агентний цикл</div>
+  <div id="agent-query" style="background:var(--bg);border-radius:var(--radius-sm);padding:10px 16px;font-size:0.9rem;margin-bottom:12px;font-weight:500;border:1px solid var(--border)"></div>
+  <div id="agent-steps"></div>
+  <div style="display:flex;gap:6px;margin-top:12px;justify-content:center">
+    <button id="agent-next-btn" onclick="agentNext()">Наступний крок →</button>
+    <button onclick="agentReset()">Скинути</button>
+    <button onclick="agentNewTask()">Інша задача</button>
+  </div>
+  <div class="hint">Натискайте «Наступний крок» — побачите, як агент думає, діє і отримує результати</div>
+</div>
+
+<p>Сучасні агенти можуть: писати і запускати код, шукати в інтернеті, працювати з файлами, викликати API, навіть керувати іншими агентами. Ключова ідея — цикл «думка → дія → спостереження» повторюється, доки задача не вирішена.</p>
+
+<div class="summary-box">
+  <strong>Підсумок частини VI:</strong> Prompt engineering покращує відповіді без зміни моделі → галюцинації — фундаментальна проблема генеративних моделей, що вигадують правдоподібні, але хибні факти → RAG зменшує галюцинації, додаючи зовнішні знання → агенти дають моделі інструменти для взаємодії зі світом.
+</div>
+
+<p style="text-align:center;color:var(--text3);font-size:0.85rem;margin-top:4rem">— Кінець мінікурсу —</p>
+
+</div>
+
+<!-- ============================================================ -->
+<!-- ALL SCRIPTS -->
+<!-- ============================================================ -->
+<script>
+const isDark = matchMedia('(prefers-color-scheme:dark)').matches;
+const hasChart = typeof window.Chart !== 'undefined';
+const txtColor = isDark ? '#e8e6dd' : '#1a1a18';
+const txtMuted = isDark ? '#9c9a92' : '#73726c';
+const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+function showChartFallback(canvasId, message){
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return;
+  const host = canvas.parentElement;
+  const minH = host.style.height || '220px';
+  host.innerHTML = `<div style="height:${minH};display:flex;align-items:center;justify-content:center;padding:16px;border:1px dashed var(--border);border-radius:var(--radius-sm);font-size:0.8rem;color:var(--text3);text-align:center;line-height:1.5">${message}</div>`;
+}
+
+// Scroll-to-top button
+(function(){
+  const btn=document.getElementById('scroll-top');
+  window.addEventListener('scroll',()=>{btn.classList.toggle('visible',window.scrollY>600)},{passive:true});
+})();
+
+// ==============================
+// 1. EMBEDDING SPACE
+// ==============================
+(function(){
+  const cv = document.getElementById('emb'), ctx = cv.getContext('2d');
+  let W, H, dpr;
+  function resize(){
+    dpr = devicePixelRatio || 1;
+    const r = cv.getBoundingClientRect();
+    W = r.width; H = 380;
+    cv.width = W * dpr; cv.height = H * dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  resize();
+  const words = [
+    {t:'кіт',x:-.6,y:.5,z:.1,c:'#7F77DD'},{t:'собака',x:-.45,y:.55,z:-.1,c:'#7F77DD'},
+    {t:'риба',x:-.3,y:.35,z:.25,c:'#7F77DD'},{t:'птах',x:-.55,y:.7,z:0,c:'#7F77DD'},
+    {t:'хліб',x:.5,y:-.3,z:.2,c:'#1D9E75'},{t:'сир',x:.55,y:-.15,z:.1,c:'#1D9E75'},
+    {t:'яблуко',x:.4,y:-.4,z:-.1,c:'#1D9E75'},{t:'суп',x:.6,y:-.25,z:-.15,c:'#1D9E75'},
+    {t:'фізика',x:-.1,y:-.6,z:-.5,c:'#D85A30'},{t:'хімія',x:.05,y:-.55,z:-.6,c:'#D85A30'},
+    {t:'алгебра',x:-.15,y:-.7,z:-.35,c:'#D85A30'},
+    {t:'дім',x:.7,y:.6,z:.3,c:'#888780'},{t:'книга',x:.2,y:.1,z:.6,c:'#888780'}
+  ];
+  let ax = 0.4, ay = 0.3, drag = false, lx, ly;
+  cv.addEventListener('pointerdown', e=>{drag=true;lx=e.clientX;ly=e.clientY;cv.setPointerCapture(e.pointerId)});
+  cv.addEventListener('pointermove', e=>{if(!drag)return;ay+=(e.clientX-lx)*0.008;ax+=(e.clientY-ly)*0.008;lx=e.clientX;ly=e.clientY;draw()});
+  cv.addEventListener('pointerup', ()=>drag=false);
+  function proj(x,y,z){
+    const ca=Math.cos(ax),sa=Math.sin(ax),cb=Math.cos(ay),sb=Math.sin(ay);
+    const x1=x*cb-z*sb,z1=x*sb+z*cb,y1=y*ca-z1*sa;
+    return {px:W/2+x1*160, py:H/2-y1*160};
+  }
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle = isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.06)';
+    ctx.lineWidth = 0.5;
+    for(let i=-6;i<=6;i++){
+      let a=proj(i/6,0,-1),b=proj(i/6,0,1);ctx.beginPath();ctx.moveTo(a.px,a.py);ctx.lineTo(b.px,b.py);ctx.stroke();
+      a=proj(-1,0,i/6);b=proj(1,0,i/6);ctx.beginPath();ctx.moveTo(a.px,a.py);ctx.lineTo(b.px,b.py);ctx.stroke();
+    }
+    const sorted = words.map(w=>{
+      const ca=Math.cos(ax),sa=Math.sin(ax),cb=Math.cos(ay),sb=Math.sin(ay);
+      const z1=w.x*sb+w.z*cb; const zr=w.y*sa+z1*ca;
+      const p=proj(w.x,w.y,w.z);return{...w,...p,zr};
+    }).sort((a,b)=>a.zr-b.zr);
+    sorted.forEach(w=>{
+      ctx.beginPath();ctx.arc(w.px,w.py,6,0,Math.PI*2);ctx.fillStyle=w.c;ctx.globalAlpha=0.85;ctx.fill();ctx.globalAlpha=1;
+      ctx.font='500 13px "DM Sans",sans-serif';ctx.fillStyle=txtColor;ctx.textAlign='center';
+      ctx.fillText(w.t,w.px,w.py-12);
+    });
+  }
+  draw();
+  if(!drag){let a=0;(function spin(){if(drag)return;ay+=0.003;a++;draw();if(a<300)requestAnimationFrame(spin)})()}
+  window.addEventListener('resize',()=>{resize();draw()});
+})();
+
+// ==============================
+// 2. SELF-ATTENTION
+// ==============================
+(function(){
+  const tokens=['Кіт','сів','на','килимок','бо','він','був','м\'яким'];
+  const weights={
+    0:[.12,.15,.03,.08,.02,.05,.02,.03],1:[.18,.10,.08,.12,.03,.05,.02,.04],
+    2:[.05,.12,.05,.30,.03,.08,.02,.05],3:[.10,.08,.05,.15,.03,.06,.02,.08],
+    4:[.08,.05,.02,.10,.05,.25,.08,.12],5:[.10,.06,.03,.42,.08,.05,.04,.12],
+    6:[.05,.04,.02,.15,.06,.28,.05,.18],7:[.08,.05,.02,.38,.06,.15,.08,.10]
+  };
+  let sel = 5;
+  const r1=document.getElementById('attn-top'),r2=document.getElementById('attn-bot');
+  const cv=document.getElementById('attnCv'),ctx=cv.getContext('2d');
+  function tokStyle(active){
+    return `padding:8px 14px;border-radius:8px;border:0.5px solid ${active?'#7F77DD':'var(--border)'};font-size:0.85rem;cursor:pointer;user-select:none;transition:all .15s;background:${active?'#7F77DD':'var(--bg)'};color:${active?'#fff':'var(--text)'}`;
+  }
+  function build(){
+    r1.innerHTML='';r2.innerHTML='';
+    tokens.forEach((t,i)=>{
+      const d1=document.createElement('div');d1.style.cssText=tokStyle(i===sel);d1.textContent=t;
+      d1.onclick=()=>{sel=i;build();draw()};r1.appendChild(d1);
+      const d2=document.createElement('div');d2.style.cssText=tokStyle(false);d2.textContent=t;
+      const w=weights[sel][i];const alpha=Math.max(0.08,w/0.45);
+      d2.style.background=`rgba(127,119,221,${alpha})`;d2.style.color=w>0.2?'#fff':'var(--text)';
+      d2.style.borderColor=`rgba(127,119,221,${Math.min(1,alpha+0.2)})`;
+      r2.appendChild(d2);
+    });
+  }
+  function getBtnCenters(container){
+    const cvRect=cv.getBoundingClientRect();
+    return Array.from(container.children).map(el=>{
+      const r=el.getBoundingClientRect();
+      return r.left+r.width/2-cvRect.left;
+    });
+  }
+  function draw(){
+    const dpr=devicePixelRatio||1;const rect=cv.getBoundingClientRect();
+    const W=rect.width,H=180;cv.width=W*dpr;cv.height=H*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+    const topC=getBtnCenters(r1),botC=getBtnCenters(r2),ws=weights[sel];
+    for(let i=0;i<tokens.length;i++){
+      const w=ws[i];if(w<0.01)continue;
+      const x1=topC[sel],x2=botC[i];
+      const cpy=10+70*Math.max(0.3,w);
+      ctx.beginPath();ctx.moveTo(x1,10);
+      ctx.bezierCurveTo(x1,cpy,x2,cpy,x2,H-10);
+      ctx.strokeStyle=`rgba(127,119,221,${Math.max(0.1,w/0.45)})`;
+      ctx.lineWidth=Math.max(1,w*12);ctx.stroke();
+      const t=0.7,t1=1-t;
+      const lx=t1*t1*t1*x1+3*t1*t1*t*x1+3*t1*t*t*x2+t*t*t*x2;
+      const ly=t1*t1*t1*10+3*t1*t1*t*cpy+3*t1*t*t*cpy+t*t*t*(H-10);
+      ctx.fillStyle=txtMuted;ctx.font='500 11px "DM Sans",sans-serif';ctx.textAlign='center';
+      ctx.fillText(Math.round(w*100)+'%',lx,ly-4);
+    }
+  }
+  build();draw();
+  window.addEventListener('resize',()=>draw());
+})();
+
+// ==============================
+// 3. LAYER STACK SVG
+// ==============================
+(function(){
+  const svg = document.getElementById('layerSvg');
+  const c = {
+    purple50: isDark?'#26215C':'#EEEDFE', purple600: isDark?'#AFA9EC':'#534AB7', purpleTxt: isDark?'#CECBF6':'#3C3489',
+    teal50: isDark?'#04342C':'#E1F5EE', teal600: isDark?'#5DCAA5':'#0F6E56', tealTxt: isDark?'#9FE1CB':'#085041',
+    coral50: isDark?'#4A1B0C':'#FAECE7', coral600: isDark?'#F0997B':'#993C1D', coralTxt: isDark?'#F5C4B3':'#712B13',
+    amber50: isDark?'#412402':'#FAEEDA', amber600: isDark?'#EF9F27':'#854F0B', amberTxt: isDark?'#FAC775':'#633806',
+    gray50: isDark?'#2C2C2A':'#F1EFE8', gray600: isDark?'#B4B2A9':'#5F5E5A', grayTxt: isDark?'#D3D1C7':'#444441',
+  };
+  const arrM = `<defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>`;
+  function box(x,y,w,h,rx,fill,stroke,label,sub,txtFill){
+    let s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="${fill}" stroke="${stroke}" stroke-width="0.5"/>`;
+    s += `<text x="${x+w/2}" y="${y+(sub!=null?22:h/2)}" text-anchor="middle" dominant-baseline="central" fill="${txtFill}" font-size="14" font-weight="500" font-family="DM Sans,sans-serif">${label}</text>`;
+    if(sub) s += `<text x="${x+w/2}" y="${y+40}" text-anchor="middle" dominant-baseline="central" fill="${txtFill}" font-size="12" opacity="0.7" font-family="DM Sans,sans-serif">${sub}</text>`;
+    return s;
+  }
+  function arr(x1,y1,x2,y2){return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${txtMuted}" stroke-width="1" marker-end="url(#arr)"/>`}
+  let h = arrM;
+  h += `<text x="340" y="608" text-anchor="middle" fill="${txtMuted}" font-size="12" font-family="DM Sans,sans-serif">Вхід: вектори токенів</text>`;
+  h += box(230,556,220,36,8,c.gray50,c.gray600,'Ембедінг + позиція',null,c.grayTxt);
+  h += arr(340,556,340,530);
+  // Layer 1
+  h += box(120,420,440,100,16,c.teal50,c.teal600,'Шар 1 — граматика','',c.tealTxt);
+  h += box(150,456,170,44,8,c.purple50,c.purple600,'Self-attention',null,c.purpleTxt);
+  h += box(360,456,170,44,8,c.coral50,c.coral600,'Feed-forward',null,c.coralTxt);
+  h += arr(320,478,358,478);
+  h += arr(340,420,340,394);
+  // Layer 2
+  h += box(120,284,440,100,16,c.teal50,c.teal600,'Шар 2 — значення','',c.tealTxt);
+  h += box(150,320,170,44,8,c.purple50,c.purple600,'Self-attention',null,c.purpleTxt);
+  h += box(360,320,170,44,8,c.coral50,c.coral600,'Feed-forward',null,c.coralTxt);
+  h += arr(320,342,358,342);
+  h += arr(340,284,340,258);
+  h += `<text x="340" y="240" text-anchor="middle" fill="${txtMuted}" font-size="14" font-family="DM Sans,sans-serif">· · ·</text>`;
+  h += arr(340,228,340,200);
+  // Layer N
+  h += box(120,90,440,100,16,c.teal50,c.teal600,'Шар N — логіка, факти','',c.tealTxt);
+  h += box(150,126,170,44,8,c.purple50,c.purple600,'Self-attention',null,c.purpleTxt);
+  h += box(360,126,170,44,8,c.coral50,c.coral600,'Feed-forward',null,c.coralTxt);
+  h += arr(320,148,358,148);
+  h += arr(340,90,340,64);
+  h += box(230,20,220,36,8,c.amber50,c.amber600,'Передбачення слова',null,c.amberTxt);
+  svg.innerHTML = h;
+})();
+
+// 3b. PARAMETER BREAKDOWN
+(function(){
+  const models=[
+    {label:'1B', layers:22, dim:2048, ffMul:5.5, vocab:32000},
+    {label:'7B', layers:32, dim:4096, ffMul:2.75, vocab:32000},
+    {label:'13B', layers:40, dim:5120, ffMul:2.7, vocab:32000},
+    {label:'70B', layers:80, dim:8192, ffMul:3.5, vocab:32000}
+  ];
+  let cur=1; // default 7B
+  const barColors=['#7F77DD','#1D9E75','#D85A30','#BA7517'];
+  const compNames=['Attention (Q,K,V,O)','Feed-forward','Ембедінг-таблиця','Інше (норми тощо)'];
+
+  function calc(m){
+    const d=m.dim, L=m.layers, V=m.vocab, ff=Math.round(d*m.ffMul);
+    const attnPerLayer=4*d*d;       // Q, K, V, O matrices
+    const ffPerLayer=2*d*ff + 2*d*ff; // up + gate + down (SwiGLU: 3 matrices, simplified as 2*2)
+    // Simplified: typical ff is 3 matrices of d×ff for SwiGLU
+    const ffActual=3*d*ff;
+    const emb=V*d;
+    const norms=L*2*d + 2*d; // layernorm per sublayer + final
+    const attnTotal=attnPerLayer*L;
+    const ffTotal=ffActual*L;
+    const total=attnTotal+ffTotal+emb+norms;
+    return {
+      comps:[attnTotal, ffTotal, emb, norms],
+      total:total,
+      layers:L, dim:d
+    };
+  }
+
+  function fmtP(n){
+    if(n>=1e9) return (n/1e9).toFixed(1)+'B';
+    if(n>=1e6) return (n/1e6).toFixed(0)+'M';
+    if(n>=1e3) return (n/1e3).toFixed(0)+'K';
+    return n.toString();
+  }
+
+  function render(){
+    const m=models[cur];
+    const r=calc(m);
+    // Tabs
+    const tabs=document.getElementById('param-tabs');tabs.innerHTML='';
+    models.forEach((mod,i)=>{
+      const d=document.createElement('div');
+      d.style.cssText=`padding:5px 14px;border-radius:20px;font-size:0.8rem;font-weight:500;border:1px solid ${i===cur?'#7F77DD':'var(--border)'};background:${i===cur?'#7F77DD':'var(--bg)'};color:${i===cur?'#fff':'var(--text2)'};cursor:pointer;transition:all .15s`;
+      d.textContent=mod.label;
+      d.onclick=()=>{cur=i;render()};tabs.appendChild(d);
+    });
+    // Bars
+    const bd=document.getElementById('param-breakdown');bd.innerHTML='';
+    const maxComp=Math.max(...r.comps);
+    r.comps.forEach((c,i)=>{
+      const pct=Math.round(c/r.total*100);
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;gap:8px;font-size:0.82rem';
+      row.innerHTML=`<span style="min-width:140px;color:var(--text2)">${compNames[i]}</span><div style="flex:1;height:22px;border-radius:4px;background:var(--bg);overflow:hidden"><div style="height:100%;border-radius:4px;width:${c/maxComp*100}%;background:${barColors[i]};transition:width .3s"></div></div><span style="min-width:55px;text-align:right;font-family:var(--font-mono);font-size:0.75rem;color:var(--text2)">${fmtP(c)}</span><span style="min-width:32px;text-align:right;font-size:0.7rem;color:var(--text3)">${pct}%</span>`;
+      bd.appendChild(row);
+    });
+    // Stats
+    document.getElementById('param-layers').textContent=r.layers;
+    document.getElementById('param-dim').textContent=r.dim;
+    document.getElementById('param-total').textContent=fmtP(r.total);
+  }
+  render();
+})();
+
+// ==============================
+// 4. TEXT GENERATION
+// ==============================
+(function(){
+  /* Кожен крок має кандидатів, що поєднуються з БУДЬ-ЯКИМ вибором на інших кроках:
+     "Сонце сходить над [місце], [дієприслівник] [об'єкт] [інструмент] [час]." */
+  const steps=[
+    {cands:[{w:'горизонтом',p:.38},{w:'містом',p:.22},{w:'полем',p:.15},{w:'морем',p:.12},{w:'горами',p:.08},{w:'лісом',p:.05}]},
+    {cands:[{w:'фарбуючи',p:.28},{w:'освітлюючи',p:.22},{w:'заливаючи',p:.18},{w:'огортаючи',p:.16},{w:'наповнюючи',p:.10},{w:'вкриваючи',p:.06}]},
+    {cands:[{w:'небо',p:.35},{w:'хмари',p:.22},{w:'світ',p:.15},{w:'обрій',p:.13},{w:'землю',p:.09},{w:'повітря',p:.06}]},
+    {cands:[{w:'золотом',p:.28},{w:'теплом',p:.20},{w:'світлом',p:.18},{w:'барвами',p:.16},{w:'промінням',p:.12},{w:'сяйвом',p:.06}]},
+    {cands:[{w:'нового дня',p:.25},{w:'світанку',p:.22},{w:'ранку',p:.20},{w:'весни',p:.15},{w:'літа',p:.10},{w:'надії',p:.08}]}
+  ];
+  let step=0,genText='',temp=0.7;
+  const colors=['#7F77DD','#AFA9EC','#CECBF6','#CECBF6','#CECBF6','#D3D1C7'];
+  function applyTemp(cands,t){const raw=cands.map(c=>Math.pow(c.p,1/t));const sum=raw.reduce((a,b)=>a+b,0);return cands.map((c,i)=>({...c,p:raw[i]/sum}))}
+  function renderBars(){
+    const bc=document.getElementById('gen-bars');bc.innerHTML='';
+    const s=steps[step];const adj=applyTemp(s.cands,temp);
+    adj.forEach((c,i)=>{
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;gap:8px;font-size:0.85rem;margin-bottom:3px';
+      row.innerHTML=`<span style="width:100px;text-align:right;color:var(--text2);flex-shrink:0;${i===0?'font-weight:500;color:var(--text)':''}">${c.w}</span><div style="flex:1;height:22px;border-radius:4px;background:var(--bg);overflow:hidden"><div style="height:100%;border-radius:4px;width:${Math.round(c.p*100)}%;background:${colors[i]};transition:width .4s"></div></div><span style="width:40px;font-size:0.75rem;color:var(--text2);text-align:right">${Math.round(c.p*100)}%</span>`;
+      bc.appendChild(row);
+    });
+  }
+  window.doGenerate = function(){
+    if(step>=steps.length)return;
+    const s=steps[step];const adj=applyTemp(s.cands,temp);
+    const r=Math.random();let cum=0,pick=adj[0].w;
+    for(const c of adj){cum+=c.p;if(r<cum){pick=c.w;break}}
+    genText+=' '+pick;
+    if(step===0) genText+=',';
+    if(step===steps.length-1) genText+='.';
+    document.getElementById('gen-prompt').innerHTML='Сонце сходить над<span style="color:#7F77DD;font-weight:500">'+genText+'</span>';
+    step++;
+    if(step<steps.length)renderBars();
+    else{document.getElementById('gen-bars').innerHTML='<div style="font-size:0.85rem;color:var(--text2);padding:8px 0">Генерація завершена! Натисни «Скинути» щоб спробувати знову.</div>';document.getElementById('gen-bars-label').style.display='none';}
+  };
+  window.doGenReset = function(){
+    step=0;genText='';
+    document.getElementById('gen-prompt').textContent='Сонце сходить над';
+    document.getElementById('gen-bars-label').style.display='';
+    renderBars();
+  };
+  document.getElementById('gen-temp').oninput=function(){temp=this.value/10;document.getElementById('gen-tval').textContent=temp.toFixed(1);if(step<steps.length)renderBars()};
+  renderBars();
+})();
+
+// ==============================
+// 5. NEXT TOKEN PREDICTION QUIZ
+// ==============================
+(function(){
+  const data=[
+    {ctx:'Сонце встає на',answer:'сході',opts:['заході','сході','обіді','стільці'],explain:'Модель навчилась із тисяч текстів, що сонце встає саме на сході.'},
+    {ctx:'Столиця України —',answer:'Київ',opts:['Львів','Київ','Одеса','Варшава'],explain:'Факти модель засвоює з навчальних текстів — енциклопедій, новин, книг.'},
+    {ctx:'Два плюс два дорівнює',answer:'чотири',opts:['три','п\'ять','чотири','сім'],explain:'Арифметику модель «вивчає» з прикладів, а не розуміє як калькулятор.'},
+    {ctx:'Він відчинив двері і зайшов до',answer:'кімнати',opts:['хмари','кімнати','числа','кольору'],explain:'Контекст дії підказує модель, що далі — фізичний простір.'},
+    {ctx:'Вода кипить при температурі 100',answer:'градусів',opts:['кілограмів','градусів','метрів','років'],explain:'Модель поєднує «температура» з «градусів» — стійка закономірність у текстах.'}
+  ];
+  let idx=0,answered=false;
+  function render(){
+    answered=false;const d=data[idx];const card=document.getElementById('ntp-card');
+    card.innerHTML=`<div style="background:var(--bg);border-radius:var(--radius-sm);padding:14px 18px"><div style="font-size:0.95rem;margin-bottom:10px">${d.ctx} <span style="display:inline-block;width:60px;border-bottom:2px solid #7F77DD"></span></div><div style="display:flex;gap:8px;flex-wrap:wrap">${d.opts.map(o=>`<div class="ntp-guess" style="padding:6px 14px;border-radius:8px;font-size:0.85rem;cursor:pointer;border:0.5px solid var(--border);background:var(--bg2);transition:all .2s" onclick="ntpPick(this,'${o.replace(/'/g,"\\'")}')">${o}</div>`).join('')}</div></div>`;
+    document.getElementById('ntp-fb').textContent='';
+    document.getElementById('ntp-next').style.display='none';
+  }
+  window.ntpPick = function(el,w){
+    if(answered)return;answered=true;
+    const d=data[idx];const correct=w===d.answer;
+    el.style.background=correct?'#1D9E75':'#E24B4A';el.style.color='#fff';el.style.borderColor=correct?'#1D9E75':'#E24B4A';
+    if(!correct){el.parentElement.querySelectorAll('.ntp-guess').forEach(g=>{if(g.textContent===d.answer){g.style.background='#1D9E75';g.style.color='#fff';g.style.borderColor='#1D9E75'}})}
+    el.parentElement.querySelectorAll('.ntp-guess').forEach(g=>{g.style.pointerEvents='none'});
+    document.getElementById('ntp-fb').innerHTML=(correct?'<span style="color:#1D9E75">Правильно!</span> ':'<span style="color:#E24B4A">Не те слово.</span> ')+d.explain;
+    document.getElementById('ntp-fill').style.width=((idx+1)/data.length*100)+'%';
+    document.getElementById('ntp-label').textContent=(idx+1)+'/'+data.length;
+    if(idx<data.length-1)document.getElementById('ntp-next').style.display='block';
+    else document.getElementById('ntp-fb').innerHTML+='<br><br>Модель тренується на <b>трильйонах</b> таких прикладів.';
+  };
+  window.ntpNext = function(){idx++;render()};
+  render();
+})();
+
+// ==============================
+// 6. LOSS FUNCTION
+// ==============================
+(function(){
+  const pts=[];for(let i=1;i<=99;i++)pts.push({x:i,y:-Math.log(i/100)});
+  const dotPlugin={id:'dot',afterDatasetsDraw(chart){
+    const meta=chart.getDatasetMeta(1);if(!meta.data.length)return;
+    const p=meta.data[0];const ct=chart.ctx;
+    ct.save();ct.beginPath();ct.arc(p.x,p.y,6,0,Math.PI*2);ct.fillStyle='#7F77DD';ct.fill();
+    ct.beginPath();ct.setLineDash([4,4]);ct.moveTo(p.x,p.y);ct.lineTo(p.x,chart.chartArea.bottom);ct.strokeStyle='rgba(127,119,221,0.4)';ct.lineWidth=1;ct.stroke();ct.restore();
+  }};
+  let chart=null;
+  if(hasChart){
+    chart=new Chart(document.getElementById('lossChart'),{
+      type:'line',data:{datasets:[
+        {data:pts.map(p=>({x:p.x,y:p.y})),borderColor:isDark?'rgba(255,255,255,0.15)':'rgba(0,0,0,0.12)',borderWidth:1.5,pointRadius:0,fill:false},
+        {data:[{x:50,y:-Math.log(0.5)}],borderColor:'#7F77DD',pointRadius:0,showLine:false}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,animation:{duration:0},
+        scales:{x:{type:'linear',min:0,max:100,title:{display:true,text:'Ймовірність правильного слова (%)',font:{size:12,family:'DM Sans'},color:txtMuted},ticks:{color:txtMuted,callback:v=>v+'%'},grid:{color:gridColor}},
+          y:{min:0,max:5,title:{display:true,text:'Loss',font:{size:12,family:'DM Sans'},color:txtMuted},ticks:{color:txtMuted},grid:{color:gridColor}}},
+        plugins:{legend:{display:false},tooltip:{enabled:false}}
+      },plugins:[dotPlugin]
+    });
+  } else {
+    showChartFallback('lossChart','Графік недоступний: не вдалося завантажити Chart.js. Повзунок і числові значення нижче все одно працюють.');
+  }
+  document.getElementById('loss-prob').oninput=function(){
+    const v=+this.value,p=v/100,loss=-Math.log(p);
+    document.getElementById('loss-pval').textContent=v+'%';
+    document.getElementById('loss-val').textContent=loss.toFixed(2);
+    const vd=document.getElementById('loss-verdict');
+    if(v>=80){vd.textContent='Відмінно';vd.style.color='#1D9E75'}
+    else if(v>=40){vd.textContent='Середньо';vd.style.color='#BA7517'}
+    else{vd.textContent='Погано';vd.style.color='#E24B4A'}
+    if(chart){chart.data.datasets[1].data=[{x:v,y:loss}];chart.update('none')}
+  };
+})();
+
+// ==============================
+// 7. GRADIENT DESCENT
+// ==============================
+(function(){
+  const cv=document.getElementById('gdCv'),ctx=cv.getContext('2d');
+  let W,H,dpr;
+  function resize(){dpr=devicePixelRatio||1;const r=cv.getBoundingClientRect();W=r.width;H=320;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}
+  resize();
+  const pad={l:50,r:20,t:20,b:40},gW=()=>W-pad.l-pad.r,gH=H-pad.t-pad.b;
+  function f(x){return 0.5+1.2*Math.sin(x*0.9)+0.4*Math.cos(x*2.1)+0.2*Math.sin(x*3.5)+0.08*x*x-0.3*x}
+  function df(x){const h=0.001;return(f(x+h)-f(x-h))/(2*h)}
+  const xMin=-4,xMax=5;
+  let ys=[];for(let i=0;i<=200;i++)ys.push(f(xMin+(xMax-xMin)*i/200));
+  const yMin=Math.min(...ys)-0.5,yMax=Math.max(...ys)+0.5;
+  function toS(x,y){return{sx:pad.l+(x-xMin)/(xMax-xMin)*gW(),sy:pad.t+(1-(y-yMin)/(yMax-yMin))*gH}}
+  function fromS(sx){return xMin+(sx-pad.l)/gW()*(xMax-xMin)}
+  let ballX=3.5,trail=[],animId=null,stepCount=0;
+  cv.onclick=function(e){const r=cv.getBoundingClientRect();ballX=Math.max(xMin+.2,Math.min(xMax-.2,fromS(e.clientX-r.left)));trail=[];stepCount=0;if(animId){cancelAnimationFrame(animId);animId=null}draw();upStats()};
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle=isDark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.06)';ctx.lineWidth=0.5;
+    for(let i=0;i<=5;i++){const y=pad.t+gH*i/5;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+gW(),y);ctx.stroke()}
+    ctx.strokeStyle=isDark?'rgba(255,255,255,0.25)':'rgba(0,0,0,0.2)';ctx.lineWidth=1.5;ctx.beginPath();
+    for(let i=0;i<=200;i++){const x=xMin+(xMax-xMin)*i/200;const s=toS(x,f(x));i===0?ctx.moveTo(s.sx,s.sy):ctx.lineTo(s.sx,s.sy)}
+    ctx.stroke();
+    ctx.fillStyle=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.03)';
+    ctx.lineTo(toS(xMax,yMin).sx,toS(0,yMin).sy);ctx.lineTo(toS(xMin,yMin).sx,toS(0,yMin).sy);ctx.closePath();ctx.fill();
+    if(trail.length>1){
+      ctx.strokeStyle='rgba(127,119,221,0.3)';ctx.lineWidth=1.5;ctx.setLineDash([4,4]);ctx.beginPath();
+      trail.forEach((p,i)=>{const s=toS(p,f(p));i===0?ctx.moveTo(s.sx,s.sy):ctx.lineTo(s.sx,s.sy)});
+      ctx.stroke();ctx.setLineDash([]);
+      trail.forEach(p=>{const s=toS(p,f(p));ctx.beginPath();ctx.arc(s.sx,s.sy,3,0,Math.PI*2);ctx.fillStyle='rgba(127,119,221,0.4)';ctx.fill()});
+    }
+    const bs=toS(ballX,f(ballX));
+    ctx.beginPath();ctx.arc(bs.sx,bs.sy,8,0,Math.PI*2);ctx.fillStyle='#7F77DD';ctx.fill();
+    ctx.beginPath();ctx.arc(bs.sx,bs.sy,8,0,Math.PI*2);ctx.strokeStyle='rgba(127,119,221,0.5)';ctx.lineWidth=2;ctx.stroke();
+    const g=df(ballX);const arrLen=Math.min(60,Math.abs(g)*25);
+    if(Math.abs(g)>0.05){
+      const dir=g>0?-1:1;ctx.beginPath();ctx.moveTo(bs.sx,bs.sy+14);ctx.lineTo(bs.sx+dir*arrLen,bs.sy+14);
+      ctx.strokeStyle='#D85A30';ctx.lineWidth=2;ctx.stroke();
+      const ax=bs.sx+dir*arrLen;ctx.beginPath();ctx.moveTo(ax,bs.sy+10);ctx.lineTo(ax+dir*6,bs.sy+14);ctx.lineTo(ax,bs.sy+18);ctx.fillStyle='#D85A30';ctx.fill();
+    }
+    ctx.font='12px "DM Sans",sans-serif';ctx.fillStyle=txtMuted;ctx.textAlign='center';ctx.fillText('Параметр (вага)',W/2,H-4);
+    ctx.save();ctx.translate(14,H/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.fillText('Loss',0,0);ctx.restore();
+  }
+  function upStats(){document.getElementById('gd-step').textContent=stepCount;document.getElementById('gd-loss').textContent=f(ballX).toFixed(3);document.getElementById('gd-grad').textContent=df(ballX).toFixed(3)}
+  window.gdReset=function(){if(animId){cancelAnimationFrame(animId);animId=null}ballX=3.5;trail=[];stepCount=0;draw();upStats()};
+  window.gdStart=function(){
+    if(animId)return;const lr=+document.getElementById('gd-lr').value/100;trail=[ballX];
+    function step(){const g=df(ballX);ballX=Math.max(xMin+.1,Math.min(xMax-.1,ballX-lr*g));trail.push(ballX);stepCount++;draw();upStats();
+      if(Math.abs(g)>0.02&&stepCount<200)animId=requestAnimationFrame(step);else animId=null}
+    animId=requestAnimationFrame(step);
+  };
+  document.getElementById('gd-lr').oninput=function(){document.getElementById('gd-lrv').textContent=(this.value/100).toFixed(2)};
+  draw();upStats();
+  window.addEventListener('resize',()=>{resize();draw()});
+})();
+
+// ==============================
+// 8. BACKPROPAGATION STEPPER
+// ==============================
+(function(){
+  const phases=[
+    {title:'1. Прямий прохід',desc:'Дані рухаються зліва направо: токени проходять через усі шари, на виході — передбачення.',dir:'forward'},
+    {title:'2. Обчислення loss',desc:'Порівнюємо передбачення з правильною відповіддю. Loss = розмір помилки.',dir:'none',hl:['loss']},
+    {title:'3. Зворотний прохід',desc:'Помилка «тече назад» (червоні стрілки). Кожен шар дізнається свій внесок у помилку.',dir:'backward'},
+    {title:'4. Оновлення ваг',desc:'Кожен параметр: вага -= learning_rate × градієнт. Модель стала трохи кращою!',dir:'none',hl:['update']}
+  ];
+  let cur=0;
+  const c = {
+    purple50: isDark?'#26215C':'#EEEDFE', purple600: isDark?'#AFA9EC':'#534AB7', purpleTxt: isDark?'#CECBF6':'#3C3489',
+    teal50: isDark?'#04342C':'#E1F5EE', teal600: isDark?'#5DCAA5':'#0F6E56', tealTxt: isDark?'#9FE1CB':'#085041',
+    coral50: isDark?'#4A1B0C':'#FAECE7', coral600: isDark?'#F0997B':'#993C1D', coralTxt: isDark?'#F5C4B3':'#712B13',
+    amber50: isDark?'#412402':'#FAEEDA', amber600: isDark?'#EF9F27':'#854F0B', amberTxt: isDark?'#FAC775':'#633806',
+    gray50: isDark?'#2C2C2A':'#F1EFE8', gray600: isDark?'#B4B2A9':'#5F5E5A', grayTxt: isDark?'#D3D1C7':'#444441',
+    green50: isDark?'#173404':'#EAF3DE', green600: isDark?'#97C459':'#3B6D11', greenTxt: isDark?'#C0DD97':'#27500A',
+  };
+  function buildPills(){
+    const el=document.getElementById('bp-pills');el.innerHTML='';
+    phases.forEach((p,i)=>{
+      const d=document.createElement('div');
+      d.style.cssText=`padding:6px 14px;border-radius:20px;font-size:0.75rem;border:0.5px solid ${i===cur?'#7F77DD':'var(--border)'};background:${i===cur?'#7F77DD':'var(--bg)'};color:${i===cur?'#fff':'var(--text2)'};cursor:pointer;transition:all .15s`;
+      d.textContent=p.title;d.onclick=()=>{cur=i;buildPills();render()};el.appendChild(d);
+    });
+  }
+  function render(){
+    const p=phases[cur];const hl=p.hl||[];document.getElementById('bp-desc').textContent=p.desc;
+    const svg=document.getElementById('bpSvg');
+    const arrM=`<defs><marker id="bpa" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>`;
+    const boxes=[
+      {x:40,y:80,w:100,h:56,label:'Ембедінг',fill:c.gray50,stroke:c.gray600,txt:c.grayTxt},
+      {x:180,y:80,w:120,h:56,label:'Шар 1',fill:c.teal50,stroke:c.teal600,txt:c.tealTxt},
+      {x:340,y:80,w:120,h:56,label:'Шар N',fill:c.teal50,stroke:c.teal600,txt:c.tealTxt},
+      {x:500,y:80,w:120,h:56,label:'Вихід',fill:c.purple50,stroke:c.purple600,txt:c.purpleTxt}
+    ];
+    let h=arrM;
+    boxes.forEach(b=>{h+=`<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="8" fill="${b.fill}" stroke="${b.stroke}" stroke-width="0.5"/><text x="${b.x+b.w/2}" y="${b.y+b.h/2}" text-anchor="middle" dominant-baseline="central" fill="${b.txt}" font-size="14" font-weight="500" font-family="DM Sans,sans-serif">${b.label}</text>`});
+    const conn=[[140,108,178,108],[300,108,338,108],[460,108,498,108]];
+    const fwC='#1D9E75',bwC='#E24B4A';
+    if(p.dir==='forward'){
+      conn.forEach(c=>{h+=`<line x1="${c[0]}" y1="${c[1]}" x2="${c[2]}" y2="${c[3]}" stroke="${fwC}" stroke-width="2.5" marker-end="url(#bpa)"/>`});
+      h+=`<text x="340" y="70" text-anchor="middle" fill="${fwC}" font-size="12" font-family="DM Sans,sans-serif">дані →</text>`;
+    } else {
+      conn.forEach(c=>{h+=`<line x1="${c[0]}" y1="${c[1]}" x2="${c[2]}" y2="${c[3]}" stroke="${fwC}" stroke-width="1" opacity="0.2" marker-end="url(#bpa)"/>`});
+    }
+    if(hl.includes('loss')){
+      h+=`<rect x="520" y="160" width="100" height="44" rx="8" fill="${c.amber50}" stroke="${c.amber600}" stroke-width="0.5"/><text x="570" y="182" text-anchor="middle" dominant-baseline="central" fill="${c.amberTxt}" font-size="14" font-weight="500" font-family="DM Sans,sans-serif">Loss</text>`;
+      h+=`<line x1="560" y1="136" x2="560" y2="158" stroke="${c.amber600}" stroke-width="1.5" marker-end="url(#bpa)"/>`;
+      h+=`<rect x="370" y="160" width="120" height="44" rx="8" fill="${c.green50}" stroke="${c.green600}" stroke-width="0.5"/><text x="430" y="182" text-anchor="middle" dominant-baseline="central" fill="${c.greenTxt}" font-size="14" font-weight="500" font-family="DM Sans,sans-serif">Правильне</text>`;
+      h+=`<line x1="490" y1="182" x2="518" y2="182" stroke="${c.amber600}" stroke-width="1" opacity="0.5" marker-end="url(#bpa)"/>`;
+    }
+    if(p.dir==='backward'){
+      [[498,118,462,118],[338,118,302,118],[178,118,142,118]].forEach(c=>{h+=`<line x1="${c[0]}" y1="${c[1]}" x2="${c[2]}" y2="${c[3]}" stroke="${bwC}" stroke-width="2.5" opacity="0.8" marker-end="url(#bpa)"/>`});
+      h+=`<text x="340" y="148" text-anchor="middle" fill="${bwC}" font-size="12" font-family="DM Sans,sans-serif">← градієнти</text>`;
+    }
+    if(hl.includes('update')){
+      [1,2].forEach(i=>{const b=boxes[i];
+        h+=`<text x="${b.x+b.w/2}" y="${b.y+b.h+18}" text-anchor="middle" fill="#7F77DD" font-size="12" font-family="Space Mono,monospace">w -= lr × grad</text>`;
+        h+=`<rect x="${b.x+10}" y="${b.y-4}" width="${b.w-20}" height="${b.h+8}" rx="10" fill="none" stroke="#7F77DD" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.6"/>`;
+      });
+    }
+    svg.innerHTML=h;
+  }
+  buildPills();render();
+})();
+
+// ==============================
+// 9. TRAINING LOSS CURVE
+// ==============================
+(function(){
+  const N=100;const pts=[];
+  for(let i=0;i<=N;i++){const t=i/N;const base=10*Math.exp(-3.5*t)+0.8;const noise=(Math.sin(i*1.7)+Math.cos(i*2.3))*0.15*Math.exp(-2*t);pts.push({x:i,y:Math.max(0.6,base+noise)})}
+  let chart=null;
+  if(hasChart){
+    chart=new Chart(document.getElementById('tlcChart'),{
+      type:'line',data:{datasets:[
+        {data:pts,borderColor:'#7F77DD',borderWidth:2,pointRadius:0,fill:{target:'origin',above:'rgba(127,119,221,0.08)'}},
+        {data:[{x:0,y:pts[0].y}],pointRadius:7,pointBackgroundColor:'#7F77DD',pointBorderColor:isDark?'#2c2c2a':'#fff',pointBorderWidth:2,showLine:false}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,animation:{duration:0},
+        scales:{x:{type:'linear',min:0,max:100,title:{display:true,text:'Тренувальні кроки (%)',font:{size:12,family:'DM Sans'},color:txtMuted},ticks:{color:txtMuted,callback:v=>v+'%'},grid:{color:gridColor}},
+          y:{min:0,max:12,title:{display:true,text:'Loss',font:{size:12,family:'DM Sans'},color:txtMuted},ticks:{color:txtMuted},grid:{color:gridColor}}},
+        plugins:{legend:{display:false},tooltip:{enabled:false}}
+      }
+    });
+  } else {
+    showChartFallback('tlcChart','Крива тренування недоступна: не вдалося завантажити Chart.js. Повзунок нижче все одно змінює етапи та приклад відповіді.');
+  }
+  const samples=[
+    {range:[0,10],q:'Столиця Франції —',a:'мавпа кольоровий сніг бігти 42...',note:'Повний хаос'},
+    {range:[11,30],q:'Столиця Франції —',a:'великий місто де живуть країна...',note:'Базова граматика, мало сенсу'},
+    {range:[31,65],q:'Столиця Франції —',a:'це місто Париж, яке знаходиться у Європі.',note:'Зв\'язні речення, є факти'},
+    {range:[66,100],q:'Столиця Франції —',a:'Париж. Найбільше місто з населенням понад 2 млн.',note:'Точні факти, чітка структура'}
+  ];
+  document.getElementById('tlc-epoch').oninput=function(){
+    const v=+this.value;
+    document.getElementById('tlc-lbl').textContent=v+'%';
+    if(chart){chart.data.datasets[1].data=[{x:v,y:pts[v].y}];chart.update('none')}
+    ['ph0','ph1','ph2','ph3'].forEach((id,i)=>{
+      const ranges=[[0,10],[11,30],[31,65],[66,100]];
+      document.getElementById(id).style.opacity=(v>=ranges[i][0]&&v<=ranges[i][1])?1:0.3;
+    });
+    const s=samples.find(s=>v>=s.range[0]&&v<=s.range[1])||samples[0];
+    document.getElementById('tlc-sample').innerHTML=`<strong style="color:var(--text)">${s.q}</strong> ${s.a}<br><span style="color:var(--text3);font-size:0.75rem">${s.note}</span>`;
+  };
+  document.getElementById('tlc-epoch').oninput();
+})();
+
+// ==============================
+// 10. SFT BEFORE/AFTER
+// ==============================
+(function(){
+  const examples=[
+    {prompt:'Яка столиця Франції?',
+     base:'А яка столиця Німеччини? А Іспанії? Ці питання часто задають на уроках географії у школі. Столиці країн Європи — популярна тема для вікторин...',
+     tuned:'Столиця Франції — Париж. Це найбільше місто країни з населенням понад 2 мільйони.'},
+    {prompt:'Напиши вірш про весну',
+     base:'напиши вірш про літо\nнапиши вірш про осінь\nнапиши вірш про зиму\nТеги: вірші, пори року, творчість, школа...',
+     tuned:'Весна прийшла — розтав сніжок,\nПробився перший стебелок.\nСпіває пташка на гілці —\nЗима лишилась позаду.'},
+    {prompt:'Поясни, що таке ДНК, простими словами',
+     base:'ДНК (дезоксирибонуклеїнова кислота) — макромолекула, що забезпечує зберігання, передачу і реалізацію генетичної програми. Структура подвійної спіралі була відкрита Уотсоном і Кріком у 1953 році. Нуклеотиди...',
+     tuned:'ДНК — це інструкція для побудови твого тіла. Уяви дуже довгу книгу рецептів: кожна сторінка описує, як зробити одну деталь — колір очей, форму носа, групу крові. Ця книга є в кожній клітині.'},
+    {prompt:'Як зварити борщ?',
+     base:'як зварити борщ рецепт\nяк зварити борщ класичний український\nяк зварити борщ без м\'яса\nВідповіді Mail.ru — кулінарія — перші страви...',
+     tuned:'1. Зваріть бульйон з яловичини (~1.5 год).\n2. Натріть буряк, моркву; наріжте картоплю, капусту, цибулю.\n3. Обсмажте буряк з морквою і цибулею, додайте томатну пасту.\n4. У бульйон покладіть картоплю, через 10 хв — капусту, ще через 5 — зажарку.\n5. Додайте часник, лавровий лист, сіль, перець. Дайте настоятись 30 хв.'}
+  ];
+  let cur=0;
+  function buildTabs(){
+    const el=document.getElementById('sft-tabs');el.innerHTML='';
+    examples.forEach((ex,i)=>{
+      const d=document.createElement('div');
+      d.style.cssText=`padding:6px 14px;border-radius:20px;font-size:0.75rem;border:0.5px solid ${i===cur?'#7F77DD':'var(--border)'};background:${i===cur?'#7F77DD':'var(--bg)'};color:${i===cur?'#fff':'var(--text2)'};cursor:pointer;transition:all .15s`;
+      d.textContent=ex.prompt.slice(0,25)+(ex.prompt.length>25?'…':'');
+      d.onclick=()=>{cur=i;buildTabs();render()};el.appendChild(d);
+    });
+  }
+  function render(){
+    const ex=examples[cur];
+    document.getElementById('sft-prompt').innerHTML='<strong>Промпт:</strong> '+ex.prompt;
+    document.getElementById('sft-base-text').textContent=ex.base;
+    document.getElementById('sft-tuned-text').textContent=ex.tuned;
+    document.getElementById('sft-base').style.borderColor='var(--border)';
+    document.getElementById('sft-base').style.background='var(--bg2)';
+    document.getElementById('sft-tuned').style.borderColor='var(--teal)';
+    document.getElementById('sft-tuned').style.background=isDark?'#04342C':'#E1F5EE';
+  }
+  buildTabs();render();
+})();
+
+// ==============================
+// 11. RLHF RATER
+// ==============================
+(function(){
+  const data=[
+    {prompt:'Як зламати чужий WiFi?',
+     a:{text:'Ось кілька способів зламати WiFi: 1) Використайте програму aircrack-ng... 2) Спробуйте підібрати пароль через WPS...',good:false,reason:'Допомагає у незаконній діяльності'},
+     b:{text:'Я не можу допомогти зламати чужу мережу — це незаконно. Якщо ви забули свій пароль, зверніться до провайдера або скиньте роутер до заводських налаштувань.',good:true,reason:'Відмовляє у шкідливому запиті, пропонує легальну альтернативу'},
+     explain:'RLHF вчить модель відмовляти у шкідливих запитах і пропонувати безпечні альтернативи.'},
+    {prompt:'Хто переміг у Другій світовій війні?',
+     a:{text:'У Другій світовій війні перемогла антигітлерівська коаліція — СРСР, США, Велика Британія та союзники. Війна тривала з 1939 по 1945 рік і завершилась капітуляцією Німеччини 8 травня та Японії 2 вересня 1945.',good:true,reason:'Точна, збалансована, фактична відповідь'},
+     b:{text:'Другу світову війну одноосібно виграв СРСР, всі інші країни лише заважали. Це найбільша перемога в історії людства, і ніхто інший не зробив нічого важливого.',good:false,reason:'Однобока, перебільшена, ігнорує внесок союзників'},
+     explain:'RLHF вчить модель давати збалансовані, фактичні відповіді без пропаганди.'},
+    {prompt:'Напиши коротко: що таке фотосинтез?',
+     a:{text:'Фотосинтез (від грец. φῶς — світло та σύνθεσις — з\'єднання) — це складний біохімічний процес перетворення енергії електромагнітного випромінювання у енергію хімічних зв\'язків. Розрізняють оксигенний фотосинтез, характерний для рослин, водоростей та ціанобактерій, та аноксигенний, що здійснюється деякими бактеріями. Під час світлової фази у тилакоїдах хлоропластів відбувається фотоліз води...',good:false,reason:'Надмірно детально, ігнорує прохання "коротко"'},
+     b:{text:'Фотосинтез — процес, при якому рослини перетворюють сонячне світло, воду та CO₂ на їжу (глюкозу) і кисень. Відбувається у листках завдяки хлорофілу.',good:true,reason:'Точно, коротко, зрозуміло — як і просив користувач'},
+     explain:'RLHF вчить модель слідувати інструкціям — якщо просять коротко, відповідай коротко.'},
+    {prompt:'Я почуваюсь дуже погано, не хочу жити',
+     a:{text:'Це сумно. Ну, буває. Спробуй подивитись фільм або з\'їсти щось смачне, може полегшає.',good:false,reason:'Знецінює почуття, несерйозна порада для серйозної ситуації'},
+     b:{text:'Мені шкода, що тобі зараз так важко. Ці почуття серйозні, і ти заслуговуєш на підтримку. Будь ласка, зверніся на гарячу лінію: 7333 (Лайфлайн Україна) — там допоможуть. Ти не один/одна.',good:true,reason:'Серйозно ставиться, направляє до спеціалістів'},
+     explain:'RLHF вчить модель серйозно реагувати на кризові ситуації та направляти до фахівців.'}
+  ];
+  let idx=0,answered=false;
+  function render(){
+    answered=false;const d=data[idx];
+    document.getElementById('rlhf-prompt').textContent=d.prompt;
+    const pair=document.getElementById('rlhf-pair');
+    pair.innerHTML=[d.a,d.b].map((r,i)=>`<div id="rlhf-opt${i}" onclick="rlhfPick(${i})" style="flex:1;border-radius:var(--radius-sm);padding:14px 16px;font-size:0.85rem;line-height:1.6;border:1.5px solid var(--border);cursor:pointer;transition:all .2s;background:var(--bg2)"><div style="font-size:0.7rem;font-family:var(--font-mono);color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Відповідь ${i===0?'A':'B'}</div>${r.text}</div>`).join('');
+    document.getElementById('rlhf-fb').textContent='';
+    document.getElementById('rlhf-next').style.display='none';
+  }
+  window.rlhfPick=function(i){
+    if(answered)return;answered=true;
+    const d=data[idx];const opts=[d.a,d.b];const picked=opts[i];const other=opts[1-i];
+    const el0=document.getElementById('rlhf-opt0'),el1=document.getElementById('rlhf-opt1');
+    const pickedEl=i===0?el0:el1,otherEl=i===0?el1:el0;
+    if(picked.good){
+      pickedEl.style.borderColor='#1D9E75';pickedEl.style.background=isDark?'#04342C':'#E1F5EE';
+      otherEl.style.opacity='0.5';
+      document.getElementById('rlhf-fb').innerHTML='<span style="color:#1D9E75">Саме так!</span> '+d.explain;
+    } else {
+      pickedEl.style.borderColor='#E24B4A';pickedEl.style.background=isDark?'#4A1B0C':'#FAECE7';
+      otherEl.style.borderColor='#1D9E75';otherEl.style.background=isDark?'#04342C':'#E1F5EE';
+      document.getElementById('rlhf-fb').innerHTML='<span style="color:#E24B4A">Не зовсім.</span> '+d.explain+'<br><span style="color:var(--text3);font-size:0.8rem">Ваш вибір: '+picked.reason+'. Краща відповідь: '+other.reason+'.</span>';
+    }
+    el0.style.cursor='default';el1.style.cursor='default';
+    document.getElementById('rlhf-fill').style.width=((idx+1)/data.length*100)+'%';
+    document.getElementById('rlhf-label').textContent=(idx+1)+'/'+data.length;
+    if(idx<data.length-1)document.getElementById('rlhf-next').style.display='block';
+    else document.getElementById('rlhf-fb').innerHTML+='<br><br>Точно так само працюють анотатори RLHF — тисячі таких порівнянь створюють <b>reward model</b>, яка автоматично оцінює відповіді.';
+  };
+  window.rlhfNext=function(){idx++;render()};
+  render();
+})();
+
+// ==============================
+// 12. LoRA VISUALIZATION
+// ==============================
+(function(){
+  const svg=document.getElementById('loraSvg');
+  const d=2048;
+  const c={
+    frozen:{fill:isDark?'#2C2C2A':'#F1EFE8',stroke:isDark?'#5F5E5A':'#B4B2A9',txt:isDark?'#B4B2A9':'#5F5E5A'},
+    loraA:{fill:isDark?'#04342C':'#E1F5EE',stroke:isDark?'#5DCAA5':'#0F6E56',txt:isDark?'#9FE1CB':'#085041'},
+    loraB:{fill:isDark?'#26215C':'#EEEDFE',stroke:isDark?'#AFA9EC':'#534AB7',txt:isDark?'#CECBF6':'#3C3489'}
+  };
+  function render(r){
+    const fullP=d*d;
+    const loraP=(d*r)+(r*d);
+    const pct=((1-loraP/fullP)*100).toFixed(1);
+    document.getElementById('lora-full').textContent=(fullP/1e6).toFixed(1)+'M';
+    document.getElementById('lora-params').textContent=loraP<1e6?(loraP/1e3).toFixed(0)+'K':(loraP/1e6).toFixed(2)+'M';
+    document.getElementById('lora-saving').textContent=pct+'%';
+    const rH=Math.max(6,Math.min(120,r*1.8));
+    let h='';
+    // W frozen
+    h+=`<rect x="40" y="40" width="140" height="140" rx="8" fill="${c.frozen.fill}" stroke="${c.frozen.stroke}" stroke-width="1" stroke-dasharray="4 3"/>`;
+    h+=`<text x="110" y="105" text-anchor="middle" dominant-baseline="central" fill="${c.frozen.txt}" font-size="14" font-weight="500" font-family="DM Sans,sans-serif">W</text>`;
+    h+=`<text x="110" y="125" text-anchor="middle" dominant-baseline="central" fill="${c.frozen.txt}" font-size="11" font-family="DM Sans,sans-serif" opacity="0.7">${d}×${d}</text>`;
+    h+=`<text x="110" y="195" text-anchor="middle" fill="${c.frozen.txt}" font-size="11" font-family="DM Sans,sans-serif">заморожена</text>`;
+    // plus sign
+    h+=`<text x="220" y="110" text-anchor="middle" dominant-baseline="central" fill="${txtMuted}" font-size="24" font-weight="300">+</text>`;
+    // A matrix
+    const aW=30,aH=rH;const aX=270,aY=110-aH/2;
+    h+=`<rect x="${aX}" y="${aY}" width="${aW}" height="${aH}" rx="4" fill="${c.loraA.fill}" stroke="${c.loraA.stroke}" stroke-width="1"/>`;
+    h+=`<text x="${aX+aW/2}" y="${Math.max(aY-8,20)}" text-anchor="middle" fill="${c.loraA.txt}" font-size="12" font-weight="500" font-family="DM Sans,sans-serif">A</text>`;
+    h+=`<text x="${aX+aW/2}" y="${Math.min(aY+aH+16,240)}" text-anchor="middle" fill="${c.loraA.txt}" font-size="10" font-family="DM Sans,sans-serif">${d}×${r}</text>`;
+    // × sign
+    h+=`<text x="320" y="110" text-anchor="middle" dominant-baseline="central" fill="${txtMuted}" font-size="16">×</text>`;
+    // B matrix
+    const bW=rH,bH=30;const bX=340,bY=110-bH/2;
+    h+=`<rect x="${bX}" y="${bY}" width="${bW}" height="${bH}" rx="4" fill="${c.loraB.fill}" stroke="${c.loraB.stroke}" stroke-width="1"/>`;
+    h+=`<text x="${bX+bW/2}" y="${bY-8}" text-anchor="middle" fill="${c.loraB.txt}" font-size="12" font-weight="500" font-family="DM Sans,sans-serif">B</text>`;
+    h+=`<text x="${bX+bW/2}" y="${bY+bH+16}" text-anchor="middle" fill="${c.loraB.txt}" font-size="10" font-family="DM Sans,sans-serif">${r}×${d}</text>`;
+    // = sign
+    const eqX=Math.max(bX+bW+30,400);
+    h+=`<text x="${eqX}" y="110" text-anchor="middle" dominant-baseline="central" fill="${txtMuted}" font-size="24" font-weight="300">=</text>`;
+    // result
+    const resX=eqX+40;
+    h+=`<rect x="${resX}" y="40" width="140" height="140" rx="8" fill="${c.loraA.fill}" stroke="${c.loraA.stroke}" stroke-width="1"/>`;
+    h+=`<text x="${resX+70}" y="100" text-anchor="middle" dominant-baseline="central" fill="${c.loraA.txt}" font-size="14" font-weight="500" font-family="DM Sans,sans-serif">W + ΔW</text>`;
+    h+=`<text x="${resX+70}" y="120" text-anchor="middle" dominant-baseline="central" fill="${c.loraA.txt}" font-size="11" font-family="DM Sans,sans-serif" opacity="0.7">адаптована</text>`;
+    // labels
+    h+=`<text x="340" y="280" text-anchor="middle" fill="${txtMuted}" font-size="12" font-family="DM Sans,sans-serif">ΔW = A × B &nbsp;(ранг r = ${r})</text>`;
+    svg.innerHTML=h;
+  }
+  document.getElementById('lora-rank').oninput=function(){
+    const r=+this.value;
+    document.getElementById('lora-rval').textContent=r;
+    render(r);
+  };
+  render(8);
+})();
+
+// ==============================
+// 13. TOKENIZER (pre-computed examples)
+// ==============================
+(function(){
+  const examples=[
+    {label:'Українська',
+     text:'Привіт! Як працюють трансформери?',
+     tokens:['При','віт','!','⎵','Як','⎵пра','цю','ють','⎵транс','фор','мер','и','?'],
+     insight:'Українське слово «трансформери» розбилось на 4 токени. Кирилиця менш представлена у словнику — модель витрачає більше токенів.'},
+    {label:'Англійська',
+     text:'Hello! How do transformers work?',
+     tokens:['Hello','!','⎵How','⎵do','⎵transformers','⎵work','?'],
+     insight:'Англійське «transformers» — один токен. Англійський текст в середньому у 2–3 рази ефективніший за токенами.'},
+    {label:'Код',
+     text:'def fibonacci(n):\n    return n if n < 2',
+     tokens:['def','⎵fibonacci','(n','):','\\n','⎵⎵⎵⎵return','⎵n','⎵if','⎵n','⎵<','⎵2'],
+     insight:'Код токенізується добре: ключові слова та назви функцій — окремі токени. Відступи можуть зливатися в один токен.'},
+    {label:'Числа',
+     text:'Населення Землі: 8,100,000,000 людей',
+     tokens:['Н','асел','ення','⎵Зем','лі',':','⎵8',',','100',',','000',',','000','⎵люд','ей'],
+     insight:'Числа розбиваються на шматки по 1–3 цифри. Саме тому LLM погано рахують — вони «бачать» число як набір окремих фрагментів.'},
+    {label:'Emoji',
+     text:'Я люблю каву ☕ і котиків 🐱!',
+     tokens:['Я','⎵люб','лю','⎵ка','ву','⎵','☕','⎵','і','⎵кот','ик','ів','⎵','🐱','!'],
+     insight:'Emoji — це окремі токени. Кожен Unicode-символ поза ASCII може «коштувати» 1–3 токени.'},
+    {label:'Рідкісні слова',
+     text:'Дезоксирибонуклеїнова кислота містить генетичну інформацію',
+     tokens:['Дез','окс','ири','бон','укл','е','їн','ова','⎵кисл','ота','⎵міст','ить','⎵ген','етич','ну','⎵','інформ','ац','ію'],
+     insight:'Рідкісне слово «дезоксирибонуклеїнова» розбилось на 8 токенів! Чим рідше слово зустрічається у тренувальних даних, тим більше токенів воно займає.'}
+  ];
+  let cur=0;
+  const colors=['#7F77DD','#1D9E75','#D85A30','#BA7517','#534AB7','#0F6E56','#993C1D','#854F0B'];
+  function buildTabs(){
+    const el=document.getElementById('tok-tabs');el.innerHTML='';
+    examples.forEach((ex,i)=>{
+      const d=document.createElement('div');
+      d.style.cssText=`padding:6px 14px;border-radius:20px;font-size:0.75rem;border:0.5px solid ${i===cur?'#7F77DD':'var(--border)'};background:${i===cur?'#7F77DD':'var(--bg)'};color:${i===cur?'#fff':'var(--text2)'};cursor:pointer;transition:all .15s`;
+      d.textContent=ex.label;
+      d.onclick=()=>{cur=i;buildTabs();render()};el.appendChild(d);
+    });
+  }
+  function render(){
+    const ex=examples[cur];
+    const chips=document.getElementById('tok-chips');
+    chips.innerHTML='';
+    ex.tokens.forEach((t,i)=>{
+      const col=colors[i%colors.length];
+      const d=document.createElement('span');
+      d.textContent=t;
+      d.style.cssText=`display:inline-block;padding:4px 8px;border-radius:4px;font-size:0.82rem;font-family:var(--font-mono);border:1px solid ${col};color:${col};background:${col}11;line-height:1.3`;
+      chips.appendChild(d);
+    });
+    const chars=ex.text.length;
+    const count=ex.tokens.length;
+    document.getElementById('tok-chars').textContent=chars;
+    document.getElementById('tok-count').textContent=count;
+    document.getElementById('tok-ratio').textContent=(chars/count).toFixed(1);
+    document.getElementById('tok-insight').textContent=ex.insight;
+  }
+  buildTabs();render();
+})();
+
+// ==============================
+// 14. KV-CACHE
+// ==============================
+(function(){
+  const tokens=['Сонце','сходить','над','золотим','обрієм',',','фарбуючи','небо','у','рожевий','колір'];
+  const prompt=3; // first 3 tokens are the prompt
+  let step=prompt; // how many tokens visible so far
+
+  // Model: attention dot-products counted
+  // Without cache: each generation step recomputes full causal attention
+  //   step k → k*(k+1)/2 dot-products (triangular)
+  // With cache: prompt pass = prompt*(prompt+1)/2, then each new token = k dot-products (one row)
+  function cumNoCache(n){
+    let t=0;for(let k=prompt;k<=n;k++) t+=k*(k+1)/2;return t;
+  }
+  function cumWithCache(n){
+    let t=prompt*(prompt+1)/2; // initial prompt (same cost, nothing to cache yet)
+    for(let k=prompt+1;k<=n;k++) t+=k; // each new token: only 1 row of k dot-products
+    return t;
+  }
+
+  function render(){
+    const grid=document.getElementById('kv-grid');
+    const n=step;
+    let html='<table style="border-collapse:collapse;font-size:0.7rem;font-family:var(--font-mono);width:100%">';
+    html+='<tr><td style="padding:4px 6px;color:var(--text3);font-size:0.65rem;min-width:55px">Q ↓ &nbsp;K →</td>';
+    for(let j=0;j<tokens.length;j++){
+      const active=j<n;
+      html+=`<td style="padding:4px 3px;text-align:center;color:${active?'var(--text)':'var(--text3)'};opacity:${active?1:0.3};font-size:0.6rem;min-width:42px">${tokens[j]}</td>`;
+    }
+    html+='</tr>';
+    for(let i=0;i<n;i++){
+      const isNew=(i===n-1&&i>=prompt);
+      const isPrompt=i<prompt;
+      html+=`<tr><td style="padding:3px 6px;font-size:0.6rem;color:${isNew?'var(--purple)':isPrompt?'var(--text2)':'var(--teal)'};white-space:nowrap;font-weight:${isNew?'700':'400'}">${tokens[i]}</td>`;
+      for(let j=0;j<tokens.length;j++){
+        let bg='transparent';
+        if(j<=i&&j<n){
+          if(isNew){
+            bg='rgba(127,119,221,0.35)'; // new computation (purple)
+          } else if(!isPrompt){
+            bg='rgba(29,158,117,0.22)'; // cached (green)
+          } else {
+            bg=isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.04)'; // prompt (gray, computed once)
+          }
+        } else if(j>=n){
+          bg=isDark?'rgba(255,255,255,0.02)':'rgba(0,0,0,0.015)';
+        }
+        html+=`<td style="padding:3px;text-align:center;background:${bg};border:1px solid var(--border);height:24px"></td>`;
+      }
+      html+='</tr>';
+    }
+    html+='</table>';
+    grid.innerHTML=html;
+
+    const genSteps=Math.max(0,n-prompt);
+    const noC=cumNoCache(n);
+    const withC=cumWithCache(n);
+
+    // Step info
+    const stepInfo=document.getElementById('kv-step-info');
+    if(genSteps===0){
+      stepInfo.innerHTML='Обробка промпту ('+prompt+' токени) — однакова вартість з кешем і без.';
+    } else {
+      const stepNoC=n*(n+1)/2;
+      const stepWithC=n;
+      stepInfo.innerHTML='Крок '+genSteps+': без кешу перерахувати <strong>'+stepNoC+'</strong> значень, з кешем — лише <strong>'+stepWithC+'</strong> (один рядок).';
+    }
+
+    document.getElementById('kv-no-cache').textContent=noC;
+    document.getElementById('kv-with-cache').textContent=withC;
+    if(genSteps===0){
+      document.getElementById('kv-saving').textContent='1×';
+      document.getElementById('kv-saving').style.color='var(--text3)';
+    } else {
+      const speedup=(noC/withC).toFixed(1);
+      document.getElementById('kv-saving').textContent=speedup+'×';
+      document.getElementById('kv-saving').style.color='var(--purple)';
+    }
+    document.getElementById('kv-status').textContent=`${n}/${tokens.length} токенів (${prompt} промпт + ${genSteps} згенеровано)`;
+    document.getElementById('kv-step-btn').disabled=(step>=tokens.length);
+  }
+  window.kvStep=function(){if(step<tokens.length){step++;render()}};
+  window.kvReset=function(){step=prompt;render()};
+  render();
+})();
+
+// ==============================
+// 15. QUANTIZATION
+// ==============================
+(function(){
+  const levels=[
+    {bits:16,label:'FP16',size:14,ram:16,quality:100,color:'#1D9E75',
+     example:'Столиця Франції — Париж. Це найбільше місто країни, розташоване на річці Сена, з населенням понад 2 мільйони.',
+     note:'Максимальна якість — еталон'},
+    {bits:8,label:'INT8',size:7,ram:8,quality:99,color:'#7F77DD',
+     example:'Столиця Франції — Париж. Це найбільше місто країни, розташоване на річці Сена, з населенням понад 2 мільйони.',
+     note:'Практично без втрат — стандарт для серверів'},
+    {bits:4,label:'Q4',size:3.5,ram:4.5,quality:97,color:'#BA7517',
+     example:'Столиця Франції — Париж. Це найбільше місто країни на річці Сена з населенням близько 2 мільйонів.',
+     note:'Золота середина — працює на ноутбуках'},
+    {bits:2,label:'Q2',size:1.75,ram:2.5,quality:85,color:'#E24B4A',
+     example:'Столиця Франції — Париж. Це велике місто в Європі. Населення великий. Знаходиться на річці.',
+     note:'Помітна деградація — граматичні помилки, втрата деталей'}
+  ];
+  let cur=0;
+  const qualityPts=[];
+  for(let b=2;b<=16;b++){
+    const q=b>=16?100:b>=8?99:b>=6?98.5:b>=4?97:b>=3?93:85;
+    qualityPts.push({x:b,y:q});
+  }
+  let chart=null;
+  if(hasChart){
+    chart=new Chart(document.getElementById('qChart'),{
+      type:'line',data:{datasets:[
+        {data:qualityPts,borderColor:isDark?'rgba(255,255,255,0.2)':'rgba(0,0,0,0.15)',borderWidth:1.5,pointRadius:0,fill:{target:'origin',above:'rgba(127,119,221,0.06)'},tension:0.4},
+        {data:[{x:levels[0].bits,y:levels[0].quality}],pointRadius:8,pointBackgroundColor:levels[0].color,pointBorderColor:isDark?'#2c2c2a':'#fff',pointBorderWidth:2.5,showLine:false}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
+        scales:{x:{type:'linear',min:1,max:17,title:{display:true,text:'Біт на параметр',font:{size:12,family:'DM Sans'},color:txtMuted},ticks:{color:txtMuted,stepSize:2},grid:{color:gridColor}},
+          y:{min:80,max:101,title:{display:true,text:'Якість (%)',font:{size:12,family:'DM Sans'},color:txtMuted},ticks:{color:txtMuted},grid:{color:gridColor}}},
+        plugins:{legend:{display:false},tooltip:{enabled:false}}
+      }
+    });
+  } else {
+    showChartFallback('qChart','Графік квантизації недоступний: не вдалося завантажити Chart.js. Таби й числові оцінки все одно працюють.');
+  }
+  function buildTabs(){
+    const el=document.getElementById('q-tabs');el.innerHTML='';
+    levels.forEach((l,i)=>{
+      const d=document.createElement('div');
+      d.style.cssText=`padding:6px 14px;border-radius:20px;font-size:0.8rem;border:1.5px solid ${i===cur?l.color:'var(--border)'};background:${i===cur?l.color:'var(--bg)'};color:${i===cur?'#fff':'var(--text2)'};cursor:pointer;transition:all .15s;font-weight:500`;
+      d.textContent=l.label+' ('+l.bits+'-біт)';
+      d.onclick=()=>{cur=i;buildTabs();render()};el.appendChild(d);
+    });
+  }
+  function render(){
+    const l=levels[cur];
+    document.getElementById('q-size').textContent=l.size+' ГБ';
+    document.getElementById('q-ram').textContent=l.ram+' ГБ';
+    const qEl=document.getElementById('q-quality');
+    qEl.textContent=l.quality+'%';qEl.style.color=l.color;
+    document.getElementById('q-example').innerHTML=`<strong style="color:var(--text)">Приклад відповіді (${l.label}):</strong><br>${l.example}<br><span style="color:var(--text3);font-size:0.75rem">${l.note}</span>`;
+    if(chart){
+      chart.data.datasets[1].data=[{x:l.bits,y:l.quality}];
+      chart.data.datasets[1].pointBackgroundColor=l.color;
+      chart.update();
+    }
+  }
+  buildTabs();render();
+})();
+
+// ==============================
+// 16. POSITIONAL ENCODING / RoPE
+// ==============================
+(function(){
+  const svg=document.getElementById('ropeSvg');
+  const DEG=12; // degrees per position step
+  const cx=185,cy=130,R=95;
+  const words=['Кіт','з\'їв','велику','рибу','вчора','ввечері','біля','річки','і','заснув','на','березі','під','зорями','тихо','мирно'];
+  function rad(d){return d*Math.PI/180}
+
+  function renderSentence(pA,pB){
+    const el=document.getElementById('rope-sentence');el.innerHTML='';
+    words.forEach((w,i)=>{
+      const isA=(i===pA),isB=(i===pB);
+      const bg=isA?'#7F77DD':isB?'#1D9E75':'var(--bg)';
+      const col=isA||isB?'#fff':'var(--text2)';
+      const brd=isA?'#7F77DD':isB?'#1D9E75':'var(--border)';
+      const d=document.createElement('div');
+      d.style.cssText='padding:4px 10px;border-radius:6px;font-size:0.8rem;border:1.5px solid '+brd+';background:'+bg+';color:'+col+';cursor:pointer;transition:all .15s;text-align:center;line-height:1.3;user-select:none';
+      d.innerHTML='<div style="font-weight:'+(isA||isB?'600':'400')+'">'+w+'</div><div style="font-size:0.6rem;opacity:0.7;font-family:var(--font-mono)">'+i+'</div>';
+      d.onclick=function(){
+        // Click to set A or B
+        if(i===pA) return;
+        if(i===pB) return;
+        // Set closer slider
+        var dA=Math.abs(i-pB),dB=Math.abs(i-pA);
+        if(pA===pB||dB<=dA){document.getElementById('rope-posA').value=i}
+        else{document.getElementById('rope-posB').value=i}
+        render();
+      };
+      el.appendChild(d);
+    });
+  }
+
+  function render(){
+    const pA=+document.getElementById('rope-posA').value;
+    const pB=+document.getElementById('rope-posB').value;
+    renderSentence(pA,pB);
+    document.getElementById('rope-posA-val').textContent=pA;
+    document.getElementById('rope-posB-val').textContent=pB;
+
+    const angA=-90+pA*DEG, angB=-90+pB*DEG;
+    const diff=Math.abs(pA-pB)*DEG, dist=Math.abs(pA-pB);
+    const att=Math.max(0,Math.cos(rad(diff)));
+
+    const axA=cx+R*Math.cos(rad(angA)), ayA=cy+R*Math.sin(rad(angA));
+    const axB=cx+R*Math.cos(rad(angB)), ayB=cy+R*Math.sin(rad(angB));
+
+    let h='';
+    // Reference circle
+    h+='<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="none" stroke="var(--border)" stroke-width="1" stroke-dasharray="4,4" opacity="0.4"/>';
+
+    // Position ticks 0-15
+    for(let i=0;i<=15;i++){
+      const a=-90+i*DEG;
+      const ix=cx+(R-4)*Math.cos(rad(a)),iy=cy+(R-4)*Math.sin(rad(a));
+      const ox=cx+(R+4)*Math.cos(rad(a)),oy=cy+(R+4)*Math.sin(rad(a));
+      const tx=cx+(R+16)*Math.cos(rad(a)),ty=cy+(R+16)*Math.sin(rad(a));
+      h+='<line x1="'+ix+'" y1="'+iy+'" x2="'+ox+'" y2="'+oy+'" stroke="var(--text3)" stroke-width="1" opacity="0.3"/>';
+      h+='<text x="'+tx+'" y="'+ty+'" text-anchor="middle" dominant-baseline="middle" font-size="9" fill="var(--text3)" font-family="var(--font-mono)">'+i+'</text>';
+    }
+
+    // Arc between arrows
+    if(dist>0){
+      const ar=38;
+      const sA=Math.min(angA,angB),eA=Math.max(angA,angB);
+      const sx=cx+ar*Math.cos(rad(sA)),sy=cy+ar*Math.sin(rad(sA));
+      const ex=cx+ar*Math.cos(rad(eA)),ey=cy+ar*Math.sin(rad(eA));
+      const la=(eA-sA)>180?1:0;
+      h+='<path d="M'+sx+','+sy+' A'+ar+','+ar+' 0 '+la+',1 '+ex+','+ey+'" fill="none" stroke="var(--text2)" stroke-width="1.5" stroke-dasharray="3,2"/>';
+      const mA=(sA+eA)/2;
+      const mx=cx+(ar+15)*Math.cos(rad(mA)),my=cy+(ar+15)*Math.sin(rad(mA));
+      h+='<text x="'+mx+'" y="'+my+'" text-anchor="middle" dominant-baseline="middle" font-size="11" fill="var(--text2)" font-weight="500">'+diff+'°</text>';
+    }
+
+    // Arrow A (purple)
+    h+='<line x1="'+cx+'" y1="'+cy+'" x2="'+axA+'" y2="'+ayA+'" stroke="#7F77DD" stroke-width="3" stroke-linecap="round"/>';
+    h+='<circle cx="'+axA+'" cy="'+ayA+'" r="5" fill="#7F77DD"/>';
+    var laX=cx+(R+30)*Math.cos(rad(angA)),laY=cy+(R+30)*Math.sin(rad(angA));
+    h+='<text x="'+laX+'" y="'+laY+'" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#7F77DD" font-weight="600">A</text>';
+
+    // Arrow B (teal)
+    h+='<line x1="'+cx+'" y1="'+cy+'" x2="'+axB+'" y2="'+ayB+'" stroke="#1D9E75" stroke-width="3" stroke-linecap="round"/>';
+    h+='<circle cx="'+axB+'" cy="'+ayB+'" r="5" fill="#1D9E75"/>';
+    var lbX=cx+(R+30)*Math.cos(rad(angB)),lbY=cy+(R+30)*Math.sin(rad(angB));
+    h+='<text x="'+lbX+'" y="'+lbY+'" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#1D9E75" font-weight="600">B</text>';
+
+    // Center dot
+    h+='<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="var(--text2)"/>';
+
+    // Attention bar (right side)
+    var bx=400,by=18,bw=26,bh=180;
+    var fh=Math.round(att*bh);
+    var ac=att>0.7?'#1D9E75':att>0.3?'#BA7517':'#D85A30';
+    if(dist===0) ac='#1D9E75';
+    h+='<text x="'+(bx+bw/2)+'" y="'+(by-8)+'" text-anchor="middle" font-size="10" fill="var(--text3)">Увага</text>';
+    h+='<rect x="'+bx+'" y="'+by+'" width="'+bw+'" height="'+bh+'" rx="5" fill="var(--bg)" stroke="var(--border)"/>';
+    if(fh>0) h+='<rect x="'+bx+'" y="'+(by+bh-fh)+'" width="'+bw+'" height="'+fh+'" rx="5" fill="'+ac+'" opacity="0.75"/>';
+    h+='<text x="'+(bx+bw+12)+'" y="'+(by+bh-fh+5)+'" text-anchor="start" font-size="15" fill="'+ac+'" font-weight="600">'+Math.round(att*100)+'%</text>';
+
+    // Legend at bottom right
+    h+='<text x="'+(bx+bw/2)+'" y="'+(by+bh+22)+'" text-anchor="middle" font-size="9" fill="var(--text3)">cos('+diff+'°)</text>';
+
+    svg.innerHTML=h;
+
+    // Stats
+    document.getElementById('rope-dist').textContent=dist+(dist===1?' позиція':dist<5?' позиції':' позицій');
+    document.getElementById('rope-angle').textContent=diff+'°';
+    var attEl=document.getElementById('rope-att');
+    attEl.textContent=Math.round(att*100)+'%';attEl.style.color=ac;
+
+    // Insight
+    var ins=document.getElementById('rope-insight');
+    if(dist===0) ins.textContent='Та сама позиція → кути збігаються → максимальна увага';
+    else if(att>0.7) ins.textContent='Близькі позиції → малий кут → висока увага';
+    else if(att>0.3) ins.textContent='Середня відстань → помірний кут → помірна увага';
+    else if(att>0) ins.textContent='Далекі позиції → великий кут → слабка увага';
+    else ins.textContent='Дуже далеко → кут ≥ 90° → увага мінімальна';
+  }
+
+  document.getElementById('rope-posA').oninput=render;
+  document.getElementById('rope-posB').oninput=render;
+  render();
+})();
+
+// ==============================
+// 17. CONTEXT WINDOW
+// ==============================
+(function(){
+  const models=[
+    {name:'GPT-2',tokens:1024,year:2019},
+    {name:'GPT-3',tokens:4096,year:2020},
+    {name:'GPT-3.5',tokens:16384,year:2022},
+    {name:'GPT-4',tokens:128000,year:2023},
+    {name:'Claude 3.5',tokens:200000,year:2024},
+    {name:'Gemini 1.5',tokens:1000000,year:2024}
+  ];
+  const maxTok=models.reduce((m,r)=>Math.max(m,r.tokens),0);
+  const tabsEl=document.getElementById('ctx-tabs');
+  const barArea=document.getElementById('ctx-bar-area');
+  let active=0;
+  function fmt(n){return n>=1000000?(n/1000000).toFixed(1)+'M':n>=1000?(n/1000)+'K':n}
+  function render(){
+    tabsEl.innerHTML='';
+    models.forEach((m,i)=>{
+      const b=document.createElement('div');
+      b.style.cssText='padding:5px 14px;border-radius:20px;font-size:0.8rem;font-weight:500;border:1px solid '+(i===active?'#7F77DD':'var(--border)')+';background:'+(i===active?'#7F77DD':'var(--bg)')+';color:'+(i===active?'#fff':'var(--text2)')+';cursor:pointer;transition:all .15s';
+      b.textContent=m.name;
+      b.onclick=()=>{active=i;render()};
+      tabsEl.appendChild(b);
+    });
+    const m=models[active];
+    barArea.innerHTML='';
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:8px;font-size:0.85rem;margin-bottom:3px';
+    const pct=Math.max(1,Math.round(m.tokens/maxTok*100));
+    row.innerHTML='<span style="width:80px;text-align:right;color:var(--text2);flex-shrink:0;font-weight:500">'+fmt(m.tokens)+'</span><div style="flex:1;height:26px;border-radius:4px;background:var(--bg);overflow:hidden"><div style="height:100%;border-radius:4px;width:'+pct+'%;background:#7F77DD;transition:width .4s"></div></div><span style="width:40px;font-size:0.75rem;color:var(--text2);text-align:right">'+m.year+'</span>';
+    barArea.appendChild(row);
+    document.getElementById('ctx-size').textContent=fmt(m.tokens)+' токенів';
+    const pages=Math.round(m.tokens/400);
+    document.getElementById('ctx-pages').textContent=pages>=1000?Math.round(pages/1000)+'K':'~'+pages;
+    const hours=(m.tokens/9000).toFixed(1);
+    document.getElementById('ctx-audio').textContent=hours>=10?Math.round(hours)+'г':hours+'г';
+  }
+  render();
+})();
+
+// ==============================
+// 18. SCALING LAWS
+// ==============================
+(function(){
+  // Simplified Chinchilla-style scaling law: L = A/N_B^a + B/D_B^b + L_inf (N,D in billions)
+  const A=2.0,alpha=0.34,B=1.5,beta=0.28,Linf=1.6;
+  function nFromSlider(v){return Math.pow(10,8+v/100*4.5)} // 100M to ~3T
+  function dFromSlider(v){return Math.pow(10,9+v/100*4.5)} // 1B to ~30T tokens
+  function cFromSlider(v){return Math.pow(10,19+v/100*7)} // 10^19 to 10^26
+
+  function fmtN(n){if(n>=1e12)return(n/1e12).toFixed(0)+'T';if(n>=1e9)return(n/1e9).toFixed(0)+'B';if(n>=1e6)return(n/1e6).toFixed(0)+'M';return n.toFixed(0)}
+  function fmtD(d){if(d>=1e12)return(d/1e12).toFixed(0)+'T tok';if(d>=1e9)return(d/1e9).toFixed(0)+'B tok';return(d/1e6).toFixed(0)+'M tok'}
+  function fmtC(c){const e=Math.log10(c);return'10^'+e.toFixed(0)+' FLOP'}
+
+  function loss(n,d){return A/Math.pow(n/1e9,alpha)+B/Math.pow(d/1e9,beta)+Linf}
+
+  // Chart: loss vs parameters for current data size
+  let chart=null;
+  if(hasChart){
+    chart=new Chart(document.getElementById('scChart'),{
+      type:'line',data:{datasets:[
+        {data:[],borderColor:'#7F77DD',borderWidth:2,pointRadius:0,fill:{target:'origin',above:'rgba(127,119,221,0.06)'},tension:0.3},
+        {data:[],pointRadius:8,pointBackgroundColor:'#7F77DD',pointBorderColor:isDark?'#2c2c2a':'#fff',pointBorderWidth:2.5,showLine:false}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,animation:{duration:150},
+        scales:{x:{type:'logarithmic',min:1e8,max:3e12,title:{display:true,text:'Параметри (N)',font:{size:11,family:'DM Sans'},color:txtMuted},ticks:{color:txtMuted,callback:function(v){if(v>=1e12)return(v/1e12)+'T';if(v>=1e9)return(v/1e9)+'B';if(v>=1e6)return(v/1e6)+'M';return v}},grid:{color:gridColor}},
+          y:{min:1.5,max:6,title:{display:true,text:'Loss',font:{size:11,family:'DM Sans'},color:txtMuted},ticks:{color:txtMuted},grid:{color:gridColor}}},
+        plugins:{legend:{display:false},tooltip:{enabled:false}}
+      }
+    });
+  } else {
+    showChartFallback('scChart','Графік scaling laws недоступний: не вдалося завантажити Chart.js. Повзунки та розраховані значення нижче все одно працюють.');
+  }
+
+  function update(){
+    const sv=+document.getElementById('sc-n').value;
+    const dv=+document.getElementById('sc-d').value;
+    const cv=+document.getElementById('sc-c').value;
+    const N=nFromSlider(sv),D=dFromSlider(dv),C=cFromSlider(cv);
+    document.getElementById('sc-nv').textContent=fmtN(N);
+    document.getElementById('sc-dv').textContent=fmtD(D);
+    document.getElementById('sc-cv').textContent=fmtC(C);
+
+    // Effective N and D limited by compute: roughly N*D*6 <= C
+    const effN=Math.min(N,Math.sqrt(C/6));
+    const effD=Math.min(D,C/(6*effN));
+
+    const L=loss(effN,effD);
+    document.getElementById('sc-loss').textContent=L.toFixed(2);
+
+    // Level
+    const lEl=document.getElementById('sc-level');
+    if(L>4.5){lEl.textContent='Сміття';lEl.style.color='#E24B4A'}
+    else if(L>3.2){lEl.textContent='Граматика';lEl.style.color='#BA7517'}
+    else if(L>2.3){lEl.textContent='Зв\'язний текст';lEl.style.color='#7F77DD'}
+    else if(L>1.9){lEl.textContent='Знання + логіка';lEl.style.color='#1D9E75'}
+    else{lEl.textContent='Frontier';lEl.style.color='#1D9E75'}
+
+    // Bottleneck
+    const contribN=A/Math.pow(effN/1e9,alpha);
+    const contribD=B/Math.pow(effD/1e9,beta);
+    const computeLimit=(effN<N*0.9||effD<D*0.9);
+    const bEl=document.getElementById('sc-bottleneck');
+    if(computeLimit){bEl.textContent='Compute ⚡';bEl.style.color='#D85A30'}
+    else if(contribN>contribD*1.3){bEl.textContent='Параметри (N)';bEl.style.color='#7F77DD'}
+    else if(contribD>contribN*1.3){bEl.textContent='Дані (D)';bEl.style.color='#1D9E75'}
+    else{bEl.textContent='Збалансовано ✓';bEl.style.color='#1D9E75'}
+
+    // Curve: loss vs N for current D
+    const pts=[];
+    for(let i=0;i<=60;i++){
+      const ni=Math.pow(10,8+i/60*4.5);
+      const eN=Math.min(ni,Math.sqrt(C/6));
+      const eD=Math.min(D,C/(6*eN));
+      pts.push({x:ni,y:loss(eN,eD)});
+    }
+    if(chart){
+      chart.data.datasets[0].data=pts;
+      chart.data.datasets[1].data=[{x:N,y:L}];
+      chart.update('none');
+    }
+  }
+  document.getElementById('sc-n').oninput=update;
+  document.getElementById('sc-d').oninput=update;
+  document.getElementById('sc-c').oninput=update;
+  update();
+})();
+
+// ==============================
+// 19. MIXTURE OF EXPERTS
+// ==============================
+(function(){
+  const tokens=['Напиши','функцію','для','сортування','масиву','в','Python'];
+  const experts=['Мова','Код','Математика','Логіка','Факти','Переклад','Стиль','Безпека'];
+  // Pre-assigned routing: each token activates top-2 experts
+  const routing={
+    0:[0,6],  // Напиши → Мова, Стиль
+    1:[1,3],  // функцію → Код, Логіка
+    2:[0,3],  // для → Мова, Логіка
+    3:[1,2],  // сортування → Код, Математика
+    4:[1,2],  // масиву → Код, Математика
+    5:[0,3],  // в → Мова, Логіка
+    6:[1,4]   // Python → Код, Факти
+  };
+  const expertColors=['#7F77DD','#1D9E75','#D85A30','#BA7517','#534AB7','#0F6E56','#993C1D','#E24B4A'];
+  let sel=3;
+
+  function buildTokens(){
+    const el=document.getElementById('moe-tokens');el.innerHTML='';
+    tokens.forEach((t,i)=>{
+      const d=document.createElement('div');
+      d.textContent=t;
+      d.style.cssText=`padding:8px 14px;border-radius:8px;font-size:0.85rem;cursor:pointer;user-select:none;transition:all .15s;border:1px solid ${i===sel?'#7F77DD':'var(--border)'};background:${i===sel?'#7F77DD':'var(--bg2)'};color:${i===sel?'#fff':'var(--text)'}`;
+      d.onclick=()=>{sel=i;buildTokens();drawSvg()};
+      el.appendChild(d);
+    });
+  }
+
+  function drawSvg(){
+    const svg=document.getElementById('moeSvg');
+    const active=routing[sel];
+    const n=experts.length;
+    // Layout
+    const routerY=50,expertY=180,routerW=120,routerH=40;
+    const routerX=340-routerW/2;
+    const expertW=65,expertH=50;
+    const totalExpW=n*expertW+(n-1)*6;
+    const expStartX=(680-totalExpW)/2;
+
+    let h='';
+    // Token arrow down to router
+    h+=`<text x="340" y="20" text-anchor="middle" fill="${txtColor}" font-size="14" font-weight="500" font-family="DM Sans,sans-serif">${tokens[sel]}</text>`;
+    h+=`<line x1="340" y1="28" x2="340" y2="${routerY}" stroke="${txtMuted}" stroke-width="1"/>`;
+
+    // Router box
+    h+=`<rect x="${routerX}" y="${routerY}" width="${routerW}" height="${routerH}" rx="8" fill="${isDark?'#26215C':'#EEEDFE'}" stroke="${isDark?'#AFA9EC':'#534AB7'}" stroke-width="1"/>`;
+    h+=`<text x="340" y="${routerY+routerH/2}" text-anchor="middle" dominant-baseline="central" fill="${isDark?'#CECBF6':'#3C3489'}" font-size="13" font-weight="500" font-family="DM Sans,sans-serif">Router (softmax)</text>`;
+
+    // Lines from router to experts
+    experts.forEach((e,i)=>{
+      const ex=expStartX+i*(expertW+6)+expertW/2;
+      const isActive=active.includes(i);
+      const col=isActive?expertColors[i]:(isDark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.06)');
+      const lw=isActive?2.5:0.5;
+      h+=`<line x1="340" y1="${routerY+routerH}" x2="${ex}" y2="${expertY}" stroke="${col}" stroke-width="${lw}" ${isActive?'':'stroke-dasharray="4 4"'}/>`;
+      // Gate weight labels on active lines
+      if(isActive){
+        const midX=(340+ex)/2,midY=(routerY+routerH+expertY)/2;
+        const weight=active[0]===i?'0.6':'0.4';
+        h+=`<rect x="${midX-16}" y="${midY-9}" width="32" height="18" rx="9" fill="${col}"/>`;
+        h+=`<text x="${midX}" y="${midY}" text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="10" font-weight="500" font-family="Space Mono,monospace">${weight}</text>`;
+      }
+    });
+
+    // Expert boxes
+    experts.forEach((e,i)=>{
+      const ex=expStartX+i*(expertW+6);
+      const isActive=active.includes(i);
+      const fill=isActive?(isDark?expertColors[i]+'22':expertColors[i]+'18'):(isDark?'rgba(255,255,255,0.03)':'rgba(0,0,0,0.02)');
+      const stroke=isActive?expertColors[i]:(isDark?'rgba(255,255,255,0.1)':'rgba(0,0,0,0.08)');
+      const txtFill=isActive?expertColors[i]:txtMuted;
+      const op=isActive?1:0.35;
+      h+=`<g opacity="${op}">`;
+      h+=`<rect x="${ex}" y="${expertY}" width="${expertW}" height="${expertH}" rx="8" fill="${fill}" stroke="${stroke}" stroke-width="${isActive?1.5:0.5}"/>`;
+      h+=`<text x="${ex+expertW/2}" y="${expertY+18}" text-anchor="middle" dominant-baseline="central" fill="${txtFill}" font-size="11" font-weight="500" font-family="DM Sans,sans-serif">${e}</text>`;
+      h+=`<text x="${ex+expertW/2}" y="${expertY+36}" text-anchor="middle" dominant-baseline="central" fill="${txtFill}" font-size="10" font-family="DM Sans,sans-serif" opacity="0.7">E${i+1}</text>`;
+      h+=`</g>`;
+    });
+
+    // Output merge
+    const outY=expertY+expertH+30;
+    active.forEach(i=>{
+      const ex=expStartX+i*(expertW+6)+expertW/2;
+      h+=`<line x1="${ex}" y1="${expertY+expertH}" x2="340" y2="${outY}" stroke="${expertColors[i]}" stroke-width="1.5"/>`;
+    });
+    h+=`<rect x="300" y="${outY}" width="80" height="30" rx="8" fill="${isDark?'#04342C':'#E1F5EE'}" stroke="${isDark?'#5DCAA5':'#0F6E56'}" stroke-width="1"/>`;
+    h+=`<text x="340" y="${outY+15}" text-anchor="middle" dominant-baseline="central" fill="${isDark?'#9FE1CB':'#085041'}" font-size="12" font-weight="500" font-family="DM Sans,sans-serif">Вихід</text>`;
+
+    svg.innerHTML=h;
+
+    // Stats
+    const activeNames=active.map(i=>experts[i]).join(' + ');
+    document.getElementById('moe-stats').innerHTML=`Токен «<strong>${tokens[sel]}</strong>» → активні: <strong>${activeNames}</strong> (${active.length} з ${n} експертів = ${Math.round(active.length/n*100)}% параметрів)`;
+  }
+
+  buildTokens();drawSvg();
+})();
+
+// ==============================
+// 20. PROMPT ENGINEERING
+// ==============================
+(function(){
+  const task='Скільки буде 17 × 24?';
+  const techniques=[
+    {label:'Zero-shot',
+     prompt:'Скільки буде 17 × 24?',
+     response:'408',
+     explain:'Просте запитання без прикладів. Модель може помилитись з арифметикою, бо «вгадує» результат як текст, а не рахує.'},
+    {label:'System prompt',
+     prompt:'[System] Ти — точний калькулятор. Завжди перевіряй обчислення двічі.\n\n[User] Скільки буде 17 × 24?',
+     response:'17 × 24 = 408.\n\nПеревірка: 17 × 24 = 17 × 20 + 17 × 4 = 340 + 68 = 408. ✓',
+     explain:'System prompt задає роль і правила поведінки. Модель «грає роль» калькулятора і додає перевірку.'},
+    {label:'Few-shot',
+     prompt:'Приклад 1: 12 × 15 = 180\nПриклад 2: 8 × 33 = 264\n\nЗапитання: 17 × 24 = ?',
+     response:'17 × 24 = 408',
+     explain:'Кілька прикладів (few-shot) показують формат відповіді. Модель «наслідує» паттерн: число × число = результат.'},
+    {label:'Chain-of-Thought',
+     prompt:'Скільки буде 17 × 24? Думай крок за кроком.',
+     response:'Крок 1: Розіб\'ю 24 на 20 + 4\nКрок 2: 17 × 20 = 340\nКрок 3: 17 × 4 = 68\nКрок 4: 340 + 68 = 408\n\nВідповідь: 408',
+     explain:'Покрокова інструкція іноді допомагає моделі не пропустити проміжні обчислення. Це часто корисно для складніших задач, але не є гарантією правильної відповіді.'},
+    {label:'Комбінація',
+     prompt:'[System] Ти — математик. Розв\'язуй задачі покроково.\n\nПриклад: 12 × 15\n→ 12×10=120, 12×5=60, 120+60=180\nВідповідь: 180\n\n[User] 17 × 24',
+     response:'→ 17×20=340, 17×4=68, 340+68=408\nВідповідь: 408',
+     explain:'Комбінація system prompt, few-shot і покрокового формату часто працює краще, ніж одна техніка окремо. Але точний виграш залежить від моделі, задачі й формулювання запиту.'}
+  ];
+  let cur=0;
+  function buildTabs(){
+    const el=document.getElementById('pe-tabs');el.innerHTML='';
+    techniques.forEach((t,i)=>{
+      const d=document.createElement('div');
+      d.style.cssText=`padding:6px 14px;border-radius:20px;font-size:0.75rem;border:1px solid ${i===cur?'#7F77DD':'var(--border)'};background:${i===cur?'#7F77DD':'var(--bg)'};color:${i===cur?'#fff':'var(--text2)'};cursor:pointer;transition:all .15s`;
+      d.textContent=t.label;
+      d.onclick=()=>{cur=i;buildTabs();render()};el.appendChild(d);
+    });
+  }
+  function render(){
+    const t=techniques[cur];
+    document.getElementById('pe-prompt').textContent=t.prompt;
+    document.getElementById('pe-response').textContent=t.response;
+    document.getElementById('pe-explain').textContent=t.explain;
+  }
+  buildTabs();render();
+})();
+
+// ==============================
+// 21. HALLUCINATIONS
+// ==============================
+(function(){
+  const quizzes=[
+    {question:'Розкажи про Тараса Шевченка',facts:[
+      {text:'Тарас Шевченко народився 9 березня 1814 року в селі Моринці.',hall:false,tip:'Правда. Народився саме в Моринцях, Звенигородський повіт.'},
+      {text:'Перше видання збірки «Кобзар» вийшло 1840 року в Петербурзі.',hall:false,tip:'Правда. Перше видання «Кобзаря» — 1840 рік, Санкт-Петербург.'},
+      {text:'Шевченко отримав ступінь доктора філософії Київського університету в 1850 році.',hall:true,tip:'Галюцинація! Шевченко ніколи не навчався в університеті. У 1847–1857 рр. він був на засланні.'},
+      {text:'Він був викуплений з кріпацтва за сприяння Карла Брюллова у 1838 році.',hall:false,tip:'Правда. Брюллов написав портрет Жуковського, який розіграли в лотерею для викупу.'}
+    ]},
+    {question:'Що таке фотосинтез?',facts:[
+      {text:'Фотосинтез — процес, при якому рослини перетворюють сонячне світло на хімічну енергію.',hall:false,tip:'Правда. Це базове визначення фотосинтезу.'},
+      {text:'Хлорофіл поглинає переважно червоне та синє світло, тому листя зелене.',hall:false,tip:'Правда. Зелене світло відбивається — тому ми бачимо листя зеленим.'},
+      {text:'Рослини вночі перемикаються на хемосинтез, використовуючи мінерали з ґрунту для енергії.',hall:true,tip:'Галюцинація! Вночі рослини використовують запасений крохмаль (клітинне дихання), а не хемосинтез.'},
+      {text:'Формула: 6CO₂ + 6H₂O + світло → C₆H₁₂O₆ + 6O₂.',hall:false,tip:'Правда. Класична сумарна реакція фотосинтезу.'}
+    ]},
+    {question:'Розкажи про планету Марс',facts:[
+      {text:'Марс — четверта планета від Сонця з двома супутниками: Фобос і Деймос.',hall:false,tip:'Правда. Обидва супутники відкриті у 1877 році.'},
+      {text:'Олімп — найвищий вулкан у Сонячній системі, близько 21.9 км заввишки.',hall:false,tip:'Правда. Гора Олімп на Марсі — найвищий відомий вулкан.'},
+      {text:'У 2019 році марсохід Curiosity виявив сліди живих мікроорганізмів у ґрунті кратера Гейл.',hall:true,tip:'Галюцинація! Curiosity знайшов органічні молекули, але НЕ сліди живих організмів. Це важлива різниця.'},
+      {text:'Марсіанська доба (сол) довша за земну приблизно на 37 хвилин.',hall:false,tip:'Правда. Сол = 24 години 37 хвилин.'}
+    ]}
+  ];
+  let curQuiz=0,total=quizzes.length,correct=0,picked=false;
+  const nextBtn=document.getElementById('hall-next-btn');
+  function syncHallControls(){
+    nextBtn.disabled=!picked;
+    nextBtn.style.opacity=picked?'1':'0.55';
+    nextBtn.style.cursor=picked?'pointer':'not-allowed';
+    nextBtn.textContent=(picked&&curQuiz===total-1)?'Пройти ще раз':'Наступне запитання';
+  }
+  function render(){
+    const q=quizzes[curQuiz];
+    document.getElementById('hall-question').textContent='Запит: «'+q.question+'»';
+    const el=document.getElementById('hall-cards');el.innerHTML='';
+    q.facts.forEach((f,i)=>{
+      const card=document.createElement('div');
+      let bg='var(--bg)',border='var(--border)',icon='';
+      if(picked){
+        bg=f.hall?'rgba(220,60,60,0.08)':'rgba(60,180,100,0.08)';
+        border=f.hall?'#dc3c3c':'#3cb464';
+        icon=f.hall?' ✗ Галюцинація':' ✓ Факт';
+      }
+      card.style.cssText='padding:12px 16px;border-radius:var(--radius-sm);border:1px solid '+border+';background:'+bg+';margin-bottom:8px;cursor:'+(picked?'default':'pointer')+';transition:all .2s;font-size:0.88rem;line-height:1.5';
+      card.innerHTML='<div>'+f.text+(picked?'<strong style="color:'+(f.hall?'#dc3c3c':'#3cb464')+'">'+icon+'</strong>':'')+'</div>'+(picked?'<div style="font-size:0.78rem;color:var(--text2);margin-top:6px;font-style:italic">'+f.tip+'</div>':'');
+      if(!picked) card.onclick=()=>{
+        picked=true;
+        if(f.hall) correct++;
+        document.getElementById('hall-score').textContent=correct+' / '+total;
+        document.getElementById('hall-result').innerHTML=f.hall?'<span style="color:#3cb464">Правильно! Ти розпізнав галюцинацію.</span>':'<span style="color:#dc3c3c">Ні, це був справжній факт. Галюцинацію підсвічено червоним.</span>';
+        render();
+      };
+      el.appendChild(card);
+    });
+    syncHallControls();
+  }
+  window.hallReset=function(){
+    if(!picked) return;
+    if(curQuiz<quizzes.length-1){
+      curQuiz++;
+    } else {
+      curQuiz=0;
+      correct=0;
+    }
+    picked=false;
+    document.getElementById('hall-result').innerHTML='';
+    document.getElementById('hall-score').textContent=correct+' / '+total;
+    render();
+  };
+  document.getElementById('hall-score').textContent=correct+' / '+total;
+  render();
+})();
+
+// ==============================
+// 22. RAG PIPELINE
+// ==============================
+(function(){
+  const phases=[
+    {title:'1. Запитання',
+     desc:'Користувач задає питання. Модель сама по собі не знає актуальну інформацію — її знання обмежені датою тренування.',
+     active:['query']},
+    {title:'2. Пошук',
+     desc:'Запитання перетворюється на вектор (ембедінг) і шукається у векторній базі даних. Знаходяться 2–5 найрелевантніших фрагментів документів.',
+     active:['query','search','db']},
+    {title:'3. Контекст',
+     desc:'Знайдені фрагменти вставляються у промпт як контекст. Тепер модель «бачить» актуальну інформацію прямо у запиті.',
+     active:['query','search','db','context']},
+    {title:'4. Генерація',
+     desc:'Модель генерує відповідь, спираючись на знайдені документи. Вона може цитувати джерела і зазвичай менше вигадує, але фактчек все одно потрібен.',
+     active:['query','search','db','context','llm','answer']}
+  ];
+  let cur=0;
+  const c={
+    q:{fill:isDark?'#26215C':'#EEEDFE',stroke:isDark?'#AFA9EC':'#534AB7',txt:isDark?'#CECBF6':'#3C3489'},
+    db:{fill:isDark?'#04342C':'#E1F5EE',stroke:isDark?'#5DCAA5':'#0F6E56',txt:isDark?'#9FE1CB':'#085041'},
+    ctx:{fill:isDark?'#412402':'#FAEEDA',stroke:isDark?'#EF9F27':'#854F0B',txt:isDark?'#FAC775':'#633806'},
+    llm:{fill:isDark?'#4A1B0C':'#FAECE7',stroke:isDark?'#F0997B':'#993C1D',txt:isDark?'#F5C4B3':'#712B13'},
+    ans:{fill:isDark?'#04342C':'#E1F5EE',stroke:isDark?'#5DCAA5':'#0F6E56',txt:isDark?'#9FE1CB':'#085041'},
+    dim:{fill:isDark?'rgba(255,255,255,0.03)':'rgba(0,0,0,0.02)',stroke:isDark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.06)',txt:isDark?'rgba(255,255,255,0.15)':'rgba(0,0,0,0.12)'}
+  };
+  function box(x,y,w,h,label,sub,cs,active){
+    const s=active?cs:c.dim;
+    let r=`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="${s.fill}" stroke="${s.stroke}" stroke-width="${active?1.5:0.5}"/>`;
+    r+=`<text x="${x+w/2}" y="${y+(sub?h/2-7:h/2)}" text-anchor="middle" dominant-baseline="central" fill="${s.txt}" font-size="13" font-weight="500" font-family="DM Sans,sans-serif">${label}</text>`;
+    if(sub) r+=`<text x="${x+w/2}" y="${y+h/2+9}" text-anchor="middle" dominant-baseline="central" fill="${s.txt}" font-size="10" font-family="DM Sans,sans-serif" opacity="0.7">${sub}</text>`;
+    return r;
+  }
+  function arrow(x1,y1,x2,y2,active,color){
+    const s=active?color||txtColor:c.dim.stroke;
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${s}" stroke-width="${active?2:0.5}" marker-end="url(#ragarr)" opacity="${active?1:0.3}"/>`;
+  }
+  function buildPills(){
+    const el=document.getElementById('rag-pills');el.innerHTML='';
+    phases.forEach((p,i)=>{
+      const d=document.createElement('div');
+      d.style.cssText=`padding:6px 14px;border-radius:20px;font-size:0.75rem;border:0.5px solid ${i===cur?'#7F77DD':'var(--border)'};background:${i===cur?'#7F77DD':'var(--bg)'};color:${i===cur?'#fff':'var(--text2)'};cursor:pointer;transition:all .15s`;
+      d.textContent=p.title;
+      d.onclick=()=>{cur=i;buildPills();drawRag()};el.appendChild(d);
+    });
+  }
+  function drawRag(){
+    const svg=document.getElementById('ragSvg');
+    const a=phases[cur].active;
+    const has=k=>a.includes(k);
+    let h=`<defs><marker id="ragarr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round"/></marker></defs>`;
+    // Query box
+    h+=box(20,110,130,60,'Запитання','"Який курс $?"',c.q,has('query'));
+    // Arrow to search
+    h+=arrow(150,140,180,140,has('search'),c.q.stroke);
+    // Search box
+    h+=box(180,110,110,60,'Пошук','ембедінг → cosine',c.q,has('search'));
+    // Arrow to DB
+    h+=arrow(235,110,235,70,has('db'),c.db.stroke);
+    // DB box
+    h+=box(180,15,110,55,'База знань','1024 документи',c.db,has('db'));
+    // Arrow from DB to context
+    h+=arrow(290,42,340,42,has('context'),c.db.stroke);
+    // Context box
+    h+=box(340,15,180,55,'Контекст','«Курс: 41.2₴/$...»',c.ctx,has('context'));
+    // Arrow from search to LLM
+    h+=arrow(290,140,370,140,has('context'),c.ctx.stroke);
+    // Arrow from context down to LLM
+    h+=arrow(430,70,430,110,has('context'),c.ctx.stroke);
+    // LLM box
+    h+=box(370,110,120,60,'LLM','генерація',c.llm,has('llm'));
+    // Arrow to answer
+    h+=arrow(490,140,530,140,has('answer'),c.ans.stroke);
+    // Answer box
+    h+=box(530,100,150,80,'Відповідь','"Поточний курс\nдолара: 41.2₴"',c.ans,has('answer'));
+    // Phase labels
+    h+=`<text x="350" y="265" text-anchor="middle" fill="${txtMuted}" font-size="11" font-family="DM Sans,sans-serif">${phases[cur].title}</text>`;
+    svg.innerHTML=h;
+    document.getElementById('rag-desc').textContent=phases[cur].desc;
+  }
+  buildPills();drawRag();
+})();
+
+// ==============================
+// 23. AGENTS & TOOLS
+// ==============================
+(function(){
+  const tasks=[
+    {query:'Яка погода в Києві і чи потрібна парасолька?',
+     steps:[
+       {type:'think',icon:'💭',label:'Думка',text:'Мені потрібно дізнатись поточну погоду в Києві. Використаю weather API.'},
+       {type:'action',icon:'🔧',label:'Виклик: weather_api',text:'weather_api(city="Київ")\n→ {"temp": 12, "condition": "rain", "humidity": 89}'},
+       {type:'think',icon:'💭',label:'Думка',text:'Зараз 12°C і дощ. Потрібно порадити парасольку і одяг.'},
+       {type:'answer',icon:'✅',label:'Відповідь',text:'У Києві зараз 12°C, дощ (вологість 89%). Так, обов\'язково візьміть парасольку! Рекомендую також легку куртку.'}
+     ]},
+    {query:'Знайди помилку в коді: def fib(n): return fib(n-1) + fib(n-2)',
+     steps:[
+       {type:'think',icon:'💭',label:'Думка',text:'Потрібно проаналізувати код. Бачу рекурсивну функцію без базового випадку — це призведе до нескінченної рекурсії.'},
+       {type:'action',icon:'🔧',label:'Виклик: run_code',text:'run_code("fib(5)")\n→ RecursionError: maximum recursion depth exceeded'},
+       {type:'think',icon:'💭',label:'Думка',text:'Підтверджено — немає базового випадку. Потрібно додати if n <= 1: return n.'},
+       {type:'action',icon:'🔧',label:'Виклик: run_code',text:'run_code("def fib(n):\\n  if n<=1: return n\\n  return fib(n-1)+fib(n-2)\\nfib(10)")\n→ 55'},
+       {type:'answer',icon:'✅',label:'Відповідь',text:'Помилка: відсутній базовий випадок рекурсії.\nВиправлений код:\ndef fib(n):\n  if n <= 1: return n\n  return fib(n-1) + fib(n-2)'}
+     ]},
+    {query:'Порівняй населення Парижа і Берліна, покажи графік',
+     steps:[
+       {type:'think',icon:'💭',label:'Думка',text:'Потрібно знайти актуальні дані про населення обох міст.'},
+       {type:'action',icon:'🔧',label:'Виклик: search',text:'search("Paris Berlin population 2024")\n→ Paris: 2.16M, Berlin: 3.75M (metro: 12.4M vs 6.1M)'},
+       {type:'think',icon:'💭',label:'Думка',text:'Маю дані. Берлін більший за місто, але Париж більший за агломерацією. Створю графік.'},
+       {type:'action',icon:'🔧',label:'Виклик: create_chart',text:'create_chart(type="bar", data={"Місто": [2.16, 3.75], "Агломерація": [12.4, 6.1]}, labels=["Париж","Берлін"])\n→ [chart.png]'},
+       {type:'answer',icon:'✅',label:'Відповідь',text:'Берлін (3.75М) більший за Париж (2.16М) як місто, але паризька агломерація (12.4М) вдвічі більша за берлінську (6.1М). Графік додано.'}
+     ]}
+  ];
+  let taskIdx=0,stepIdx=0;
+
+  function render(){
+    const task=tasks[taskIdx];
+    document.getElementById('agent-query').textContent='👤 '+task.query;
+    const el=document.getElementById('agent-steps');el.innerHTML='';
+    for(let i=0;i<=stepIdx&&i<task.steps.length;i++){
+      const s=task.steps[i];
+      const colors={think:{bg:isDark?'#26215C':'#EEEDFE',border:isDark?'#AFA9EC':'#534AB7',text:isDark?'#CECBF6':'#3C3489'},
+                    action:{bg:isDark?'#412402':'#FAEEDA',border:isDark?'#EF9F27':'#854F0B',text:isDark?'#FAC775':'#633806'},
+                    answer:{bg:isDark?'#04342C':'#E1F5EE',border:isDark?'#5DCAA5':'#0F6E56',text:isDark?'#9FE1CB':'#085041'}};
+      const cs=colors[s.type];
+      const isLatest=(i===stepIdx);
+      const d=document.createElement('div');
+      d.style.cssText=`background:${cs.bg};border:1px solid ${cs.border};border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:8px;transition:all .3s;opacity:${isLatest?1:0.7}`;
+      d.innerHTML=`<div style="font-size:0.7rem;font-family:var(--font-mono);color:${cs.text};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">${s.icon} ${s.label}</div><div style="font-size:0.85rem;color:${cs.text};line-height:1.5;white-space:pre-wrap">${s.text}</div>`;
+      el.appendChild(d);
+    }
+    document.getElementById('agent-next-btn').disabled=(stepIdx>=task.steps.length-1);
+  }
+  window.agentNext=function(){
+    if(stepIdx<tasks[taskIdx].steps.length-1){stepIdx++;render()}
+  };
+  window.agentReset=function(){stepIdx=0;render()};
+  window.agentNewTask=function(){taskIdx=(taskIdx+1)%tasks.length;stepIdx=0;render()};
+  render();
+})();
+</script>
+</body>
+</html>
