@@ -4,7 +4,7 @@
 
 ## Міні-курси
 
-### [Як працюють LLM-трансформери](https://nomadic.github.io/llm-primer/llm-minicourse.html)
+### [Як працюють LLM-трансформери](https://nomadic.github.io/llm-abetka/llm-minicourse.html)
 
 Інтерактивний мінікурс з 23 розділів — від токенів до агентів. Охоплює:
 
